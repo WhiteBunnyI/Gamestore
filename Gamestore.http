@@ -1,0 +1,14 @@
+﻿@Gamestore_HostAddress = https://localhost:7105
+
+@id=1
+GET {{Gamestore_HostAddress}}/api/users/{{id}}
+
+###
+
+GET {{Gamestore_HostAddress}}/api/users/{{id}}
+
+###
+
+GET {{Gamestore_HostAddress}}/api/users/{{id}}
+
+###
