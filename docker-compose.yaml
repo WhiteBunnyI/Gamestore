@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRESPASS}
+    volumes:
+      - ./DB/Init.sql:/docker-entrypoint-initdb.d/0.sql
+      - ./DB/Table_generator.sql:/docker-entrypoint-initdb.d/1.sql
+      - ./DB/Data_Insert.sql:/docker-entrypoint-initdb.d/2.sql
+    expose:
+      - 5432
+    networks:
+      - lan
+  
+  web:
+    build: .
+    environment:
+      - DbSettings__password=${POSTGRESPASS}
+      - ASPNETCORE_ENVIRONMENT=${ASP_ENV}
+    ports:
+      - 4344:8080
+    depends_on:
+      - db
+    networks:
+      - lan
+
+networks:
+  lan:
+    driver: bridge

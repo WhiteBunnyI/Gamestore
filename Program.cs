@@ -2,6 +2,7 @@ using Gamestore.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
 using Npgsql;
+using System.Diagnostics;
 using System.Xml.Linq;
 
 namespace Gamestore
@@ -17,7 +18,10 @@ namespace Gamestore
             builder.Services.AddControllers();
 
             //Add postgresql
-            var connectionString = builder.Configuration.GetConnectionString("postgresdb");
+            var dbArgs = builder.Configuration["DbSettings:default"];
+            var dbPass = builder.Configuration["DbSettings:password"];
+            string connectionString = dbArgs + $"Password={dbPass}";
+
             builder.Services.AddDbContextPool<AppDb>(options => options.UseNpgsql(connectionString));
             builder.Services.AddHealthChecks().AddDbContextCheck<AppDb>();
             builder.Services.AddSwaggerGen();
@@ -30,6 +34,7 @@ namespace Gamestore
                 app.UseExceptionHandler("/Error");
                 // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
                 app.UseHsts();
+                app.MapHealthChecks("/health");
             }
 
             app.UseHttpsRedirection();
@@ -44,8 +49,6 @@ namespace Gamestore
 
             app.MapSwagger();
             app.UseSwaggerUI();
-
-            app.MapHealthChecks("/health");
 
             app.Run();
         }
