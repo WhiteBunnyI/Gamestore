@@ -1,4 +1,4 @@
-using Gamestore.Data;
+using Gamestore.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
 using Npgsql;
@@ -14,16 +14,17 @@ namespace Gamestore
             var builder = WebApplication.CreateBuilder(args);
 
             // Add services to the container.
-            builder.Services.AddRazorPages();
+            builder.Services.AddRazorPages();   
             builder.Services.AddControllers();
 
             //Add postgresql
-            var dbArgs = builder.Configuration["DbSettings:default"];
-            var dbPass = builder.Configuration["DbSettings:password"];
-            string connectionString = dbArgs + $"Password={dbPass}";
 
-            builder.Services.AddDbContextPool<AppDb>(options => options.UseNpgsql(connectionString));
-            builder.Services.AddHealthChecks().AddDbContextCheck<AppDb>();
+            var init = builder.Configuration["DbSettings:init"];
+            var password = builder.Configuration["DbSettings:password"];
+            string connectionString = $"{init};Password={password}";
+
+            builder.Services.AddDbContextPool<DbCtx>(options => options.UseNpgsql(connectionString));
+            builder.Services.AddHealthChecks().AddDbContextCheck<DbCtx>();
             builder.Services.AddSwaggerGen();
 
             var app = builder.Build();
