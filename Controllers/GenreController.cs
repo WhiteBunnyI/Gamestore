@@ -24,7 +24,10 @@ namespace Gamestore.Controllers
             if (name != null)
                 genre ??= await _ctx.Genres.FirstOrDefaultAsync(g => g.Name == name);
 
-            return genre is not null ? Results.Ok(genre) : Results.BadRequest();
+            if(genre == null)
+                return Results.BadRequest();
+
+            return Results.Ok(genre);
         }
 
         [HttpGet("get-all")]
