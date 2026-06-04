@@ -1,8 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using Microsoft.EntityFrameworkCore;
+using System.Text.Json.Serialization;
 
 namespace Gamestore.Models;
 
@@ -22,6 +20,7 @@ public class GameVersion
     [Column("description")]
     public string Description { get; set; } = null!;
 
+    [JsonIgnore]
     [ForeignKey("GameId")]
     [InverseProperty("GameVersions")]
     public Game Game { get; set; } = null!;

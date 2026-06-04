@@ -1,8 +1,9 @@
-﻿using System;
+﻿using Microsoft.EntityFrameworkCore;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using Microsoft.EntityFrameworkCore;
+using System.Text.Json.Serialization;
 
 namespace Gamestore.Models;
 
@@ -18,6 +19,7 @@ public class Country
     [StringLength(30)]
     public string Name { get; set; } = null!;
 
+    [JsonIgnore]
     [InverseProperty("Country")]
     public ICollection<Publisher> Publishers { get; set; } = new List<Publisher>();
 }

@@ -1,8 +1,9 @@
-﻿using System;
+﻿using Microsoft.EntityFrameworkCore;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using Microsoft.EntityFrameworkCore;
+using System.Text.Json.Serialization;
 
 namespace Gamestore.Models;
 
@@ -35,9 +36,11 @@ public class Game
     [Column("publisher_id")]
     public int PublisherId { get; set; }
 
+    [JsonIgnore]
     [InverseProperty("Game")]
     public ICollection<GameVersion> GameVersions { get; set; } = new List<GameVersion>();
 
+    [JsonIgnore]
     [ForeignKey("PublisherId")]
     [InverseProperty("Games")]
     public Publisher Publisher { get; set; } = null!;

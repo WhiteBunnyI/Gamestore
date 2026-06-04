@@ -11,18 +11,25 @@ public class GameController : AppControllerBase
     {
     }
 
+    private async Task<Game?> GetGameObj(int? id, string? title)
+    {
+        Game? game = null;
+
+        if (id != null)
+            game ??= await _ctx.Games.FindAsync(id);
+
+        if (title != null)
+            game ??= await _ctx.Games.FirstOrDefaultAsync(g => g.Title == title);
+
+        return game;
+    }
+
     [HttpGet("get")]
     [ProducesResponseType(typeof(Game), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IResult> GetGame(int? id, string? title)
     {
-        Game? game = null;
-
-        if(id != null)
-            game ??= await _ctx.Games.FindAsync(id);
-
-        if(title != null)
-            game ??= await _ctx.Games.FirstOrDefaultAsync(g => g.Title == title);
+        Game? game = await GetGameObj(id, title);
         
         if(game == null)
             return Results.BadRequest();
@@ -64,5 +71,93 @@ public class GameController : AppControllerBase
 
         await transaction.CommitAsync();
         return Results.Ok($"Пользователь {login} успешно приобрел игру {game.Title}!");
+    }
+
+    [HttpGet("get-genres")]
+    [ProducesResponseType(typeof(IEnumerable<Genre>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IResult> GetGameGenres(int? id, string? title)
+    {
+        var game = await GetGameObj(id, title);
+
+        if (game == null)
+            return Results.BadRequest();
+
+        var genres = await _ctx.GameGenres
+            .Where(gg => gg.GameId == game.Id)
+            .Include(gg => gg.Genre)
+            .Select(gg => gg.Genre)
+            .ToListAsync();
+
+        if (genres == null)
+            return Results.NotFound();
+
+        return Results.Ok(genres);
+    }
+
+    [HttpGet("get-publisher")]
+    [ProducesResponseType(typeof(Publisher), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IResult> GetGamePublisher(int? id, string? title)
+    {
+        var game = await GetGameObj(id, title);
+
+        if (game == null)
+            return Results.BadRequest();
+
+        await _ctx.Entry(game)
+            .Reference(g => g.Publisher)
+            .LoadAsync();
+
+        if (game.Publisher == null)
+            return Results.NotFound();
+
+        return Results.Ok(game.Publisher);
+    }
+
+    [HttpGet("get-version-history")]
+    [ProducesResponseType(typeof(IEnumerable<GameVersion>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IResult> GetGameVersionHistory(int? id, string? title)
+    {
+        var game = await GetGameObj(id, title);
+
+        if (game == null)
+            return Results.BadRequest();
+
+        await _ctx.Entry(game)
+            .Collection(g => g.GameVersions)
+            .LoadAsync();
+
+        if (game.GameVersions == null)
+            return Results.NotFound();
+
+        return Results.Ok(game.GameVersions);
+    }
+
+    [HttpGet("get-version")]
+    [ProducesResponseType(typeof(GameVersion), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IResult> GetGameVersion(int? id, string? title)
+    {
+        var game = await GetGameObj(id, title);
+
+        if (game == null)
+            return Results.BadRequest();
+
+        var version = await _ctx.Entry(game)
+            .Collection(g => g.GameVersions)
+            .Query()
+            .OrderByDescending(gg => gg.DateRelease)
+            .FirstOrDefaultAsync();
+
+        if (version == null)
+            return Results.NotFound();
+
+        return Results.Ok(version);
     }
 }

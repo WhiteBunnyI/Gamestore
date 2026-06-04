@@ -1,8 +1,9 @@
-﻿using System;
+﻿using Microsoft.EntityFrameworkCore;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using Microsoft.EntityFrameworkCore;
+using System.Text.Json.Serialization;
 
 namespace Gamestore.Models;
 
@@ -17,9 +18,11 @@ public class GameGenre
     [Column("genre_id")]
     public int GenreId { get; set; }
 
+    [JsonIgnore]
     [ForeignKey("GameId")]
     public Game Game { get; set; } = null!;
 
+    [JsonIgnore]
     [ForeignKey("GenreId")]
     public Genre Genre { get; set; } = null!;
 }
