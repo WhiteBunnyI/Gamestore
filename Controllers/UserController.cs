@@ -38,6 +38,7 @@ namespace Gamestore.Controllers
             int added = await _ctx.Users
                 .Upsert(new User() { Login = login })
                 .On(u => u.Login)
+                .NoUpdate()
                 .RunAsync();
 
             if(added == 0)
@@ -66,42 +67,6 @@ namespace Gamestore.Controllers
         public async void DeleteUser(string login)
         {
             throw new NotImplementedException();
-        }
-
-
-        [HttpPost("buy-game")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status409Conflict)]
-        public async Task<IResult> BuyGame(string login, int gameId)
-        {
-            _logger.LogInformation("Пользователь {Login} хочет купить игру {GameId}", login, gameId);
-
-            using var transaction = await _ctx.Database.BeginTransactionAsync();
-
-            if (await _ctx.Users.FirstOrDefaultAsync(u => u.Login == login) is not User user)
-                return Results.BadRequest($"Пользователь с логином {login} не найден!");
-
-            if (await _ctx.Games.FindAsync(gameId) is not Game game)
-                return Results.BadRequest($"Игры с id: {gameId} не найдено!");
-
-            int gameAdded = await _ctx.GameUsers
-                .Upsert(new GameUser { UserId = user.Id, GameId = gameId })
-                .On(gu => new { gu.UserId, gu.GameId })
-                .RunAsync();
-
-            if (gameAdded == 0)
-                return Results.Conflict($"Пользователь {login} уже приобрел игру {game.Title}");
-
-            var check = await _ctx.Users
-                .Where(u => u.Login == login && u.Wallet >= game.Price)
-                .ExecuteUpdateAsync(s => s.SetProperty(u => u.Wallet, u => u.Wallet - game.Price));
-
-            if (check == 0)
-                return Results.BadRequest($"На балансе пользователя {login} недостаточно средств!");
-
-            await transaction.CommitAsync();
-            return Results.Ok($"Пользователь {login} успешно приобрел игру {game.Title}!");
         }
     }
 }

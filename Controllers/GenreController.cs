@@ -20,7 +20,7 @@ namespace Gamestore.Controllers
             if (id != null)
                 genre ??= await _ctx.Genres.FindAsync(id);
 
-            name?.Capitalize();
+            name = name?.Capitalize();
             if (name != null)
                 genre ??= await _ctx.Genres.FirstOrDefaultAsync(g => g.Name == name);
 
@@ -42,12 +42,13 @@ namespace Gamestore.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IResult> AddGenre(string name)
         {
-            name.Capitalize();
+            name = name.Capitalize();
             var check = await _ctx.Genres.FirstOrDefaultAsync(g => g.Name.Equals(name));
 
             int added = await _ctx.Genres
                 .Upsert(new Genre { Name = name })
                 .On(g => g.Name)
+                .NoUpdate()
                 .RunAsync();
 
             if(added == 0)
@@ -61,7 +62,7 @@ namespace Gamestore.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IResult> RemoveGenre(string name)
         {
-            name.Capitalize();
+            name = name.Capitalize();
             var check = await _ctx.Genres.FirstOrDefaultAsync(g => g.Name.Equals(name));
             if (check == null) return Results.BadRequest($"Жанра {name} не существует!");
 

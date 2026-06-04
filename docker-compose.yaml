@@ -28,14 +28,6 @@ services:
 networks:
   lan:
     driver: bridge
-    develop:
-      watch:
-        - path: ./
-          action: rebuild
-
-networks:
-  lan:
-    driver: bridge
 
 volumes:
   pg_data:
