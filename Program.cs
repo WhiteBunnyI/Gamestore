@@ -1,9 +1,5 @@
 using Gamestore.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.OpenApi;
-using Npgsql;
-using System.Diagnostics;
-using System.Xml.Linq;
 
 namespace Gamestore
 {
@@ -14,7 +10,7 @@ namespace Gamestore
             var builder = WebApplication.CreateBuilder(args);
 
             // Add services to the container.
-            builder.Services.AddRazorPages();   
+            builder.Services.AddRazorPages();
             builder.Services.AddControllers();
 
             //Add postgresql
