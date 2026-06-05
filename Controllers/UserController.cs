@@ -9,6 +9,25 @@ namespace Gamestore.Controllers
     {
         public UsersController(DbCtx db, ILogger<UsersController> logger) : base(db, logger) { }
 
+        [HttpPost("add")]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        [ProducesResponseType(typeof(User), StatusCodes.Status200OK)]
+        public async Task<IResult> AddUser(string login)
+        {
+            var check = await _ctx.Users.FirstOrDefaultAsync(u => u.Login == login);
+
+            int added = await _ctx.Users
+                .Upsert(new User() { Login = login })
+                .On(u => u.Login)
+                .NoUpdate()
+                .RunAsync();
+
+            if (added == 0)
+                return Results.Conflict($"Пользователь {login} уже существует!");
+
+            return Results.Ok($"Пользователь {login} был добавлен!");
+        }
+
         [HttpGet("get")]
         [ProducesResponseType(typeof(User), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -25,26 +44,6 @@ namespace Gamestore.Controllers
                 return Results.BadRequest();
 
             return Results.Ok(user);
-        }
-
-
-        [HttpPost("add")]
-        [ProducesResponseType(StatusCodes.Status409Conflict)]
-        [ProducesResponseType(typeof(User), StatusCodes.Status200OK)]
-        public async Task<IResult> AddUser(string login)
-        {
-            var check = await _ctx.Users.FirstOrDefaultAsync(u => u.Login == login);
-
-            int added = await _ctx.Users
-                .Upsert(new User() { Login = login })
-                .On(u => u.Login)
-                .NoUpdate()
-                .RunAsync();
-
-            if(added == 0)
-                return Results.Conflict($"Пользователь {login} уже существует!");
-
-            return Results.Ok($"Пользователь {login} был добавлен!");
         }
 
         [HttpPut("deposit")]

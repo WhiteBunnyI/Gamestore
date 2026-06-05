@@ -11,6 +11,77 @@ public class GameController : AppControllerBase
     {
     }
 
+    [HttpPost("add")]
+    public async Task<IResult> AddGame([FromBody] Game.GameDto gameDto)
+    {
+        var game = new Game
+        {
+            Title = gameDto.Title,
+            Description = gameDto.Description,
+            DateRelease = DateOnly.FromDateTime(DateTime.UtcNow),
+            SystemRequired = gameDto.SystemRequired,
+            Price = gameDto.Price,
+            PublisherId = gameDto.PublisherId
+        };
+
+        var (result, text) = game.IsValid();
+        if (!result)
+            return Results.BadRequest(text);
+
+        if (await _ctx.Publishers.FindAsync(game.PublisherId) is null)
+            return Results.BadRequest($"Издателя с id: {game.PublisherId} не существует!");
+
+        var added = await _ctx.Games
+            .Upsert(game)
+            .On(g => g.Title)
+            .NoUpdate()
+            .RunAsync();
+
+        if (added == 0)
+            return Results.Conflict($"Игра с названием {game.Title} уже существует!");
+
+        game = await _ctx.Games.AsNoTracking()
+            .Where(g => g.Title.Equals(game.Title))
+            .FirstOrDefaultAsync();
+
+        if (game == null)
+            return Results.Problem("Не удалось добавить разработчиков и жанры к игре. Добавьте вручную");
+
+        Task[] tasks = new Task[2];
+        if (gameDto.Developers.Count > 0)
+        {
+            var devs = await _ctx.Developers
+                .Where(d => gameDto.Developers.Contains(d.Name))
+                .ToListAsync();
+
+            var devsList = devs
+                .Select(d => new GameDeveloper { DeveloperId = d.Id, GameId = game.Id })
+                .ToList();
+
+            tasks[0] = _ctx.GameDevelopers.AddRangeAsync(devsList);
+        }
+
+        if (gameDto.Genres.Count > 0)
+        {
+            var genres = await _ctx.Genres
+                .Where(d => gameDto.Genres.Contains(d.Name))
+                .ToListAsync();
+
+            var genList = genres
+                .Select(g => new GameGenre { GenreId = g.Id, GameId = game.Id })
+                .ToList();
+
+            tasks[1] = _ctx.GameGenres.AddRangeAsync(genList);
+        }
+
+        foreach (var task in tasks)
+            if (task != null)
+                await task;
+
+        return Results.Ok();
+
+    }
+
     private async Task<Game?> GetGameObj(int? id, string? title)
     {
         Game? game = null;
@@ -30,10 +101,10 @@ public class GameController : AppControllerBase
     public async Task<IResult> GetGame(int? id, string? title)
     {
         Game? game = await GetGameObj(id, title);
-        
-        if(game == null)
+
+        if (game == null)
             return Results.BadRequest();
-        
+
         return Results.Ok(game);
     }
 

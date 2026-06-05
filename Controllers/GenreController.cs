@@ -10,6 +10,26 @@ namespace Gamestore.Controllers
     {
         public GenreController(DbCtx db, ILogger<GenreController> logger) : base(db, logger) { }
 
+        [HttpPost("add")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IResult> AddGenre(string name)
+        {
+            name = name.Capitalize();
+            var check = await _ctx.Genres.FirstOrDefaultAsync(g => g.Name.Equals(name));
+
+            int added = await _ctx.Genres
+                .Upsert(new Genre { Name = name })
+                .On(g => g.Name)
+                .NoUpdate()
+                .RunAsync();
+
+            if (added == 0)
+                return Results.Conflict($"Жанр {name} уже существует!");
+
+            return Results.Ok();
+        }
+
         [HttpGet("get")]
         [ProducesResponseType(typeof(Genre), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -35,26 +55,6 @@ namespace Gamestore.Controllers
         public async Task<IResult> GetAllGenres()
         {
             return Results.Ok(await _ctx.Genres.Select(g => g.Name).ToArrayAsync());
-        }
-
-        [HttpPost("add")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<IResult> AddGenre(string name)
-        {
-            name = name.Capitalize();
-            var check = await _ctx.Genres.FirstOrDefaultAsync(g => g.Name.Equals(name));
-
-            int added = await _ctx.Genres
-                .Upsert(new Genre { Name = name })
-                .On(g => g.Name)
-                .NoUpdate()
-                .RunAsync();
-
-            if(added == 0)
-                return Results.Conflict($"Жанр {name} уже существует!");
-
-            return Results.Ok();
         }
 
         [HttpDelete("delete")]

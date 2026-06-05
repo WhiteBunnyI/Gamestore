@@ -13,6 +13,27 @@ namespace Gamestore.Controllers
         {
         }
 
+        [HttpPost("add")]
+        public async Task<IResult> AddPublisher(string pubName, string countryName)
+        {
+            pubName = pubName.Capitalize();
+            countryName = countryName.Capitalize();
+
+            if (await _ctx.Countries.FirstOrDefaultAsync(c => c.Name == countryName) is not Country country)
+                return Results.BadRequest($"Страна {countryName} не найдена!");
+
+            int added = await _ctx.Publishers
+                .Upsert(new Publisher { Name = pubName, CountryId = country.Id })
+                .On(p => p.Name)
+                .NoUpdate()
+                .RunAsync();
+
+            if (added == 0)
+                return Results.BadRequest($"Издатель {pubName} уже существует!");
+
+            return Results.Ok($"издатель {pubName} был добавлен!");
+        }
+
         [HttpGet("get")]
         [ProducesResponseType(typeof(Publisher), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -31,27 +52,6 @@ namespace Gamestore.Controllers
                 return Results.BadRequest();
 
             return Results.Ok(pub);
-        }
-
-        [HttpPost("add")]
-        public async Task<IResult> AddPublisher(string pubName, string countryName)
-        {
-            pubName = pubName.Capitalize();
-            countryName = countryName.Capitalize();
-
-            if (await _ctx.Countries.FirstOrDefaultAsync(c => c.Name == countryName) is not Country country)
-                return Results.BadRequest($"Страна {countryName} не найдена!");
-
-            int added = await _ctx.Publishers
-                .Upsert(new Publisher { Name = pubName, CountryId = country.Id })
-                .On(p => p.Name)
-                .NoUpdate()
-                .RunAsync();
-
-            if(added == 0)
-                return Results.BadRequest($"Издатель {pubName} уже существует!");
-
-            return Results.Ok($"издатель {pubName} был добавлен!");
         }
 
         [HttpDelete("delete")]
