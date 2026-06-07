@@ -1,6 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
@@ -11,6 +9,13 @@ namespace Gamestore.Models;
 [Index("Name", Name = "country_name_key", IsUnique = true)]
 public class Country
 {
+    public class CountryDto
+    {
+        [Required]
+        [StringLength(30)]
+        public string Name { get; set; } = null!;
+    }
+
     [Key]
     [Column("id")]
     public int Id { get; set; }
@@ -22,4 +27,9 @@ public class Country
     [JsonIgnore]
     [InverseProperty("Country")]
     public ICollection<Publisher> Publishers { get; set; } = new List<Publisher>();
+
+    [JsonIgnore]
+    [InverseProperty("Country")]
+    public ICollection<Developer> Developers { get; set; } = new List<Developer>();
+
 }

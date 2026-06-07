@@ -30,11 +30,10 @@ public class Game
         [StringLength(500)]
         public string SystemRequired { get; set; } = null!;
 
-        public ICollection<string> Developers { get; set; } = new List<string>();
-        public ICollection<string> Genres { get; set; } = new List<string>();
-
-
+        public ICollection<int> Developers { get; set; } = new List<int>();
+        public ICollection<int> Genres { get; set; } = new List<int>();
     }
+
 
     [Key]
     [Column("id")]
@@ -75,24 +74,4 @@ public class Game
     [ForeignKey("PublisherId")]
     [InverseProperty("Games")]
     public Publisher Publisher { get; set; } = null!;
-
-    public (bool result, string text) IsValid()
-    {
-        if (Price < 0)
-            return (false, "Цена должна быть >= 0");
-
-        if (Price >= float.MaxValue)
-            return (false, "Укажите цену меньше");
-
-        if (Title.Length > 50)
-            return (false, "Длина названия должно быть <= 50");
-
-        if (Description.Length > 2000)
-            return (false, "Длина описания должно быть <= 2000");
-
-        if (SystemRequired.Length > 500)
-            return (false, "Длина системных требований должно быть <= 500");
-
-        return (true, string.Empty);
-    }
 }

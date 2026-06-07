@@ -10,6 +10,13 @@ namespace Gamestore.Models;
 [Index("Name", Name = "genre_name_key", IsUnique = true)]
 public class Genre
 {
+    public class GenreDto
+    {
+        [Required]
+        [StringLength(30)]
+        public string Name { get; set; } = null!;
+    }
+
     [Key]
     [Column("id")]
     public int Id { get; set; }

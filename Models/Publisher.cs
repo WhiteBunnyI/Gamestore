@@ -11,6 +11,17 @@ namespace Gamestore.Models;
 [Index("Name", Name = "publisher_name_key", IsUnique = true)]
 public class Publisher
 {
+    public class PublisherDto
+    {
+        [Required]
+        [StringLength(30)]
+        public string PublisherName { get; set; } = null!;
+
+        [Required]
+        [StringLength(30)]
+        public string CountryName { get; set; } = null!;
+    }
+
     [Key]
     [Column("id")]
     public int Id { get; set; }
