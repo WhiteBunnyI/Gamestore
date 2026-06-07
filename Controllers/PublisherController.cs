@@ -1,26 +1,30 @@
 ﻿using Gamestore.Extensions;
 using Gamestore.Models;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Data.Common;
 
 namespace Gamestore.Controllers
 {
-    [Route("api/publisher")]
+    [Route("api/publishers")]
     public class PublisherController : AppControllerBase
     {
+        protected override string Entity => "Издатель";
+
         public PublisherController(DbCtx db, ILogger<PublisherController> logger) : base(db, logger)
         {
         }
 
         [HttpPost("add")]
-        public async Task<IResult> AddPublisher(string pubName, string countryName)
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+        public async Task<IResult> AddPublisher([FromBody] Publisher.PublisherDto dto)
         {
-            pubName = pubName.Capitalize();
-            countryName = countryName.Capitalize();
+            string pubName = dto.PublisherName.Capitalize();
+            string countryName = dto.CountryName.Capitalize();
 
             if (await _ctx.Countries.FirstOrDefaultAsync(c => c.Name == countryName) is not Country country)
-                return Results.BadRequest($"Страна {countryName} не найдена!");
+                return Results.BadRequest(NOT_FOUND_EXACT_MESSAGE($"Страна {countryName}"));
 
             int added = await _ctx.Publishers
                 .Upsert(new Publisher { Name = pubName, CountryId = country.Id })
@@ -29,14 +33,14 @@ namespace Gamestore.Controllers
                 .RunAsync();
 
             if (added == 0)
-                return Results.BadRequest($"Издатель {pubName} уже существует!");
+                return Results.BadRequest(CONFLICT_AUTO_MESSAGE);
 
-            return Results.Ok($"издатель {pubName} был добавлен!");
+            return Results.Ok(SUCCESS_AUTO_MESSAGE);
         }
 
         [HttpGet("get")]
         [ProducesResponseType(typeof(Publisher), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
         public async Task<IResult> GetPublisher(int? id, string? name)
         {
             Publisher? pub = null;
@@ -49,19 +53,31 @@ namespace Gamestore.Controllers
                 pub ??= await _ctx.Publishers.AsNoTracking().FirstOrDefaultAsync(p => p.Name == name);
 
             if (pub == null)
-                return Results.BadRequest();
+                return Results.BadRequest(NOT_FOUND_AUTO_MESSAGE);
 
             return Results.Ok(pub);
         }
 
         [HttpDelete("delete")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
         public async Task<IResult> DeletePublisher(int id)
         {
-            var check = await _ctx.Publishers.Where(p => p.Id == id).ExecuteDeleteAsync();
-            if(check == 0)
-                return Results.BadRequest();
+            int deleted = 0;
+            try
+            {
+                deleted = await _ctx.Publishers
+                .Where(u => u.Id == id)
+                .ExecuteDeleteAsync();
+            }
+            catch (DbException ex)
+            when (ex is Npgsql.PostgresException pgEx && pgEx.SqlState.Equals(Npgsql.PostgresErrorCodes.ForeignKeyViolation))
+            {
+                return Results.BadRequest(FOREIGN_KEY_VIOLATION_MESSAGE);
+            }
+
+            if (deleted == 0)
+                return Results.BadRequest(NOT_FOUND_AUTO_MESSAGE);
 
             return Results.Ok();
         }

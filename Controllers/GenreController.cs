@@ -2,20 +2,23 @@ using Gamestore.Extensions;
 using Gamestore.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Data.Common;
 
 namespace Gamestore.Controllers
 {
     [Route("api/genres")]
     public class GenreController : AppControllerBase
     {
+        protected override string Entity => "Жанр";
+
         public GenreController(DbCtx db, ILogger<GenreController> logger) : base(db, logger) { }
 
         [HttpPost("add")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<IResult> AddGenre(string name)
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+        public async Task<IResult> AddGenre([FromBody] Genre.GenreDto dto)
         {
-            name = name.Capitalize();
+            string name = dto.Name.Capitalize();
             var check = await _ctx.Genres.FirstOrDefaultAsync(g => g.Name.Equals(name));
 
             int added = await _ctx.Genres
@@ -25,14 +28,14 @@ namespace Gamestore.Controllers
                 .RunAsync();
 
             if (added == 0)
-                return Results.Conflict($"Жанр {name} уже существует!");
+                return Results.Conflict(CONFLICT_AUTO_MESSAGE);
 
             return Results.Ok();
         }
 
         [HttpGet("get")]
         [ProducesResponseType(typeof(Genre), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
         public async Task<IResult> GetGenre(int? id, string? name)
         {
             Genre? genre = null;
@@ -59,14 +62,24 @@ namespace Gamestore.Controllers
 
         [HttpDelete("delete")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<IResult> RemoveGenre(string name)
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+        public async Task<IResult> RemoveGenre(int id)
         {
-            name = name.Capitalize();
-            var check = await _ctx.Genres.FirstOrDefaultAsync(g => g.Name.Equals(name));
-            if (check == null) return Results.BadRequest($"Жанра {name} не существует!");
+            int deleted = 0;
+            try
+            {
+                deleted = await _ctx.Genres
+                .Where(u => u.Id == id)
+                .ExecuteDeleteAsync();
+            }
+            catch (DbException ex)
+            when (ex is Npgsql.PostgresException pgEx && pgEx.SqlState.Equals(Npgsql.PostgresErrorCodes.ForeignKeyViolation))
+            {
+                return Results.BadRequest(FOREIGN_KEY_VIOLATION_MESSAGE);
+            }
 
-            await _ctx.Genres.Where(g => g.Name.Equals(name)).ExecuteDeleteAsync();
+            if (deleted == 0) 
+                return Results.BadRequest(NOT_FOUND_AUTO_MESSAGE);
 
             return Results.Ok();
         }

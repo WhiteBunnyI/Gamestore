@@ -1,36 +1,38 @@
 ﻿using Gamestore.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Data.Common;
+using System.Diagnostics;
 
 namespace Gamestore.Controllers
 {
     [Route("api/users")]
     public class UsersController : AppControllerBase
     {
+        protected override string Entity => "Пользователь";
+
         public UsersController(DbCtx db, ILogger<UsersController> logger) : base(db, logger) { }
 
         [HttpPost("add")]
-        [ProducesResponseType(StatusCodes.Status409Conflict)]
         [ProducesResponseType(typeof(User), StatusCodes.Status200OK)]
-        public async Task<IResult> AddUser(string login)
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+        public async Task<IResult> AddUser([FromBody] User.UserDto dto)
         {
-            var check = await _ctx.Users.FirstOrDefaultAsync(u => u.Login == login);
-
             int added = await _ctx.Users
-                .Upsert(new User() { Login = login })
+                .Upsert(new User() { Login = dto.Login })
                 .On(u => u.Login)
                 .NoUpdate()
                 .RunAsync();
 
             if (added == 0)
-                return Results.Conflict($"Пользователь {login} уже существует!");
+                return Results.BadRequest(CONFLICT_AUTO_MESSAGE);
 
-            return Results.Ok($"Пользователь {login} был добавлен!");
+            return Results.Ok(SUCCESS_AUTO_MESSAGE);
         }
 
         [HttpGet("get")]
         [ProducesResponseType(typeof(User), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
         public async Task<IResult> GetUser(int? id, string? login)
         {
             User? user = null;
@@ -41,31 +43,49 @@ namespace Gamestore.Controllers
                 user ??= await _ctx.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Login == login);
 
             if (user == null)
-                return Results.BadRequest();
+                return Results.BadRequest(NOT_FOUND_AUTO_MESSAGE);
 
             return Results.Ok(user);
         }
 
         [HttpPut("deposit")]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
         public async Task<IResult> DepositBalance(string login, float value)
         {
-            if (value <= 0) return Results.BadRequest("Нельзя пополнить сумму <= 0");
+            if (value <= 0) return Results.BadRequest("Сумма (value) должна быть неотрицательной");
 
-            var check = await _ctx.Users.FirstOrDefaultAsync(u => u.Login == login);
-            if (check == null) return Results.BadRequest($"Не найден пользователь с логином {login}");
+            int changed = await _ctx.Users.Where(u => u.Login == login)
+                .ExecuteUpdateAsync(s => s.SetProperty(u => u.Wallet, u => u.Wallet + value));
 
-            check.Wallet += value;
-            await _ctx.SaveChangesAsync();
+            if(changed == 0)
+                return Results.BadRequest(NOT_FOUND_AUTO_MESSAGE);
 
             return Results.Ok();
         }
 
         [HttpDelete("delete")]
-        public async void DeleteUser(string login)
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+        public async Task<IResult> DeleteUser(int id)
         {
-            throw new NotImplementedException();
+            int deleted = 0;
+            try
+            {
+                deleted = await _ctx.Users
+                .Where(u => u.Id == id)
+                .ExecuteDeleteAsync();
+            }
+            catch (DbException ex)
+            when (ex is Npgsql.PostgresException pgEx && pgEx.SqlState.Equals(Npgsql.PostgresErrorCodes.ForeignKeyViolation))
+            {
+                return Results.BadRequest(FOREIGN_KEY_VIOLATION_MESSAGE);
+            }
+
+            if (deleted == 0)
+                return Results.BadRequest(NOT_FOUND_AUTO_MESSAGE);
+
+            return Results.Ok();
         }
     }
 }
