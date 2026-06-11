@@ -61,7 +61,6 @@ namespace Gamestore.Controllers
             return Results.Ok();
         }
 
-        [Authorize]
         [HttpDelete("delete")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
