@@ -1,7 +1,6 @@
-﻿using Gamestore.Extensions;
-using Gamestore.Models;
+﻿using Gamestore.Models;
+using Gamestore.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using System.Data.Common;
 
 namespace Gamestore.Controllers;
@@ -11,8 +10,10 @@ public class CountryController : AppControllerBase
 {
     protected override string Entity => "Страна";
 
-    public CountryController(DbCtx db, ILogger<CountryController> logger) : base(db, logger)
+    private CountryService _countryService;
+    public CountryController(DbCtx db, ILogger<CountryController> logger, CountryService countryService) : base(db, logger)
     {
+        _countryService = countryService;
     }
 
     [HttpPost("add")]
@@ -20,11 +21,7 @@ public class CountryController : AppControllerBase
     [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
     public async Task<IResult> AddCountry([FromBody] Country.CountryDto dto)
     {
-        int added = await _ctx.Countries
-            .Upsert(new Country { Name = dto.Name.Capitalize() })
-            .On(c => c.Name)
-            .NoUpdate()
-            .RunAsync();
+        int added = await _countryService.Add(new Country { Name = dto.Name });
 
         if (added == 0)
             return Results.BadRequest(CONFLICT_AUTO_MESSAGE);
@@ -40,9 +37,9 @@ public class CountryController : AppControllerBase
         Country? country = null;
 
         if (id != null)
-            country ??= await _ctx.Countries.FindAsync(id);
+            country ??= await _countryService.Get(id.Value);
         if (name != null)
-            country ??= await _ctx.Countries.Where(c => c.Name == name.Capitalize()).FirstOrDefaultAsync();
+            country ??= await _countryService.Get(name);
 
         if (country == null)
             return Results.BadRequest(NOT_FOUND_AUTO_MESSAGE);
@@ -58,16 +55,13 @@ public class CountryController : AppControllerBase
         int deleted = 0;
         try
         {
-            deleted = await _ctx.Countries
-            .Where(c => c.Id == id)
-            .ExecuteDeleteAsync();
+            deleted = await _countryService.Delete(id);
         }
         catch (DbException ex)
-        when(ex is Npgsql.PostgresException pgEx && pgEx.SqlState.Equals(Npgsql.PostgresErrorCodes.ForeignKeyViolation))
+        when (ex is Npgsql.PostgresException pgEx && pgEx.SqlState.Equals(Npgsql.PostgresErrorCodes.ForeignKeyViolation))
         {
             return Results.BadRequest(FOREIGN_KEY_VIOLATION_MESSAGE);
         }
-
 
         if (deleted == 0)
             return Results.BadRequest(NOT_FOUND_AUTO_MESSAGE);

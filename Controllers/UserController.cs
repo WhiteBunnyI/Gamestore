@@ -1,9 +1,7 @@
 ﻿using Gamestore.Models;
+using Gamestore.Services;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using System.Data.Common;
 using System.Security.Claims;
 
@@ -13,19 +11,16 @@ namespace Gamestore.Controllers
     public class UsersController : AppControllerBase
     {
         protected override string Entity => "Пользователь";
+        private UserService _userService;
 
-        public UsersController(DbCtx db, ILogger<UsersController> logger) : base(db, logger) {  }
+        public UsersController(DbCtx db, ILogger<UsersController> logger, UserService userService) : base(db, logger) { _userService = userService; }
 
         [HttpPost("add")]
         [ProducesResponseType(typeof(User), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
         public async Task<IResult> AddUser([FromBody] User.UserDto dto)
         {
-            int added = await _ctx.Users
-                .Upsert(new User() { Login = dto.Login })
-                .On(u => u.Login)
-                .NoUpdate()
-                .RunAsync();
+            int added = await _userService.Add(new User() { Login = dto.Login });
 
             if (added == 0)
                 return Results.BadRequest(CONFLICT_AUTO_MESSAGE);
@@ -41,9 +36,9 @@ namespace Gamestore.Controllers
             User? user = null;
 
             if (id != null)
-                user ??= await _ctx.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id);
+                user ??= await _userService.Get(id.Value);
             if (login != null)
-                user ??= await _ctx.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Login == login);
+                user ??= await _userService.Get(login);
 
             if (user == null)
                 return Results.BadRequest(NOT_FOUND_AUTO_MESSAGE);
@@ -58,8 +53,7 @@ namespace Gamestore.Controllers
         {
             if (value <= 0) return Results.BadRequest("Сумма (value) должна быть неотрицательной");
 
-            int changed = await _ctx.Users.Where(u => u.Login == login)
-                .ExecuteUpdateAsync(s => s.SetProperty(u => u.Wallet, u => u.Wallet + value));
+            int changed = await _userService.DepositWallet(login, value);
 
             if (changed == 0)
                 return Results.BadRequest(NOT_FOUND_AUTO_MESSAGE);
@@ -73,17 +67,12 @@ namespace Gamestore.Controllers
         [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
         public async Task<IResult> DeleteUser()
         {
-            if (User.Identity == null)
-                return Results.Unauthorized();
-
             var id = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
             int deleted = 0;
             try
             {
-                deleted = await _ctx.Users
-                .Where(u => u.Id == id)
-                .ExecuteDeleteAsync();
+                deleted = await _userService.Delete(id);
             }
             catch (DbException ex)
             when (ex is Npgsql.PostgresException pgEx && pgEx.SqlState.Equals(Npgsql.PostgresErrorCodes.ForeignKeyViolation))

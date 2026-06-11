@@ -9,7 +9,6 @@ namespace Gamestore
 {
     public class Program
     {
-        public static byte[] SECRET_KEY_BYTES => Encoding.UTF8.GetBytes(SECRET_KEY);
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);

@@ -20,6 +20,11 @@ public class Publisher
         [Required]
         [StringLength(30)]
         public string CountryName { get; set; } = null!;
+
+        //Тк получаем через тело (FromBody, т.е. через json), то он не будет заполнен, его надо заполнить вручную
+        //Кроме того оно будет игнорироваться и при остальных атрибутах (FromQuery и тд), т.к. не имеет св-в get и set
+        //[JsonIgnore]
+        //public int CountryId;
     }
 
     [Key]

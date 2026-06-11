@@ -1,4 +1,5 @@
 using Gamestore.Models;
+using Gamestore.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Text;
@@ -10,8 +11,22 @@ public class GameController : AppControllerBase
 {
     protected override string Entity => "Игра";
 
-    public GameController(DbCtx db, ILogger<GameController> logger) : base(db, logger)
+    private DeveloperService _developerService;
+    private PublisherService _publisherService;
+    private GenreService _genreService;
+    private UserService _userService;
+    private GameService _gameService;
+
+    public GameController(DbCtx db, ILogger<GameController> logger,
+        PublisherService publisherService, GameService gameService, 
+        GenreService genreService, DeveloperService developerService,
+        UserService userService) : base(db, logger)
     {
+        _developerService = developerService;
+        _publisherService = publisherService;
+        _genreService = genreService;
+        _gameService = gameService;
+        _userService = userService;
     }
 
     [HttpPost("add")]
@@ -30,14 +45,10 @@ public class GameController : AppControllerBase
             PublisherId = gameDto.PublisherId
         };
 
-        if (await _ctx.Publishers.FindAsync(game.PublisherId) is null)
+        if (await _publisherService.Get(game.PublisherId) is null)
             return Results.BadRequest(NOT_FOUND_EXACT_MESSAGE("Издатель"));
 
-        var added = await _ctx.Games
-            .Upsert(game)
-            .On(g => g.Title)
-            .NoUpdate()
-            .RunAsync();
+        var added = await _gameService.Add(game);
 
         if (added == 0)
             return Results.Conflict(CONFLICT_AUTO_MESSAGE);
@@ -138,10 +149,10 @@ public class GameController : AppControllerBase
         Game? game = null;
 
         if (id != null)
-            game ??= await _ctx.Games.FindAsync(id);
+            game ??= await _gameService.Get(id.Value);
 
         if (title != null)
-            game ??= await _ctx.Games.FirstOrDefaultAsync(g => g.Title == title);
+            game ??= await _gameService.Get(title);
 
         return game;
     }
@@ -169,10 +180,10 @@ public class GameController : AppControllerBase
 
         using var transaction = await _ctx.Database.BeginTransactionAsync();
 
-        if (await _ctx.Users.FirstOrDefaultAsync(u => u.Login == login) is not User user)
+        if (await _userService.Get(login) is not User user)
             return Results.BadRequest(NOT_FOUND_EXACT_MESSAGE($"Пользователь {login}"));
 
-        if (await _ctx.Games.FindAsync(gameId) is not Game game)
+        if (await _gameService.Get(gameId) is not Game game)
             return Results.BadRequest(NOT_FOUND_EXACT_MESSAGE($"Игра с id: {gameId}"));
 
         int gameAdded = await _ctx.GameUsers

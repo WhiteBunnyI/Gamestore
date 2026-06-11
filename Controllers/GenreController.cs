@@ -1,5 +1,6 @@
 using Gamestore.Extensions;
 using Gamestore.Models;
+using Gamestore.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Data.Common;
@@ -11,21 +12,16 @@ namespace Gamestore.Controllers
     {
         protected override string Entity => "Жанр";
 
-        public GenreController(DbCtx db, ILogger<GenreController> logger) : base(db, logger) { }
+        private GenreService _genreService;
+
+        public GenreController(DbCtx db, ILogger<GenreController> logger, GenreService genreService) : base(db, logger) { _genreService = genreService; }
 
         [HttpPost("add")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
         public async Task<IResult> AddGenre([FromBody] Genre.GenreDto dto)
         {
-            string name = dto.Name.Capitalize();
-            var check = await _ctx.Genres.FirstOrDefaultAsync(g => g.Name.Equals(name));
-
-            int added = await _ctx.Genres
-                .Upsert(new Genre { Name = name })
-                .On(g => g.Name)
-                .NoUpdate()
-                .RunAsync();
+            int added = await _genreService.Add(new Genre { Name = dto.Name });
 
             if (added == 0)
                 return Results.Conflict(CONFLICT_AUTO_MESSAGE);
@@ -41,13 +37,12 @@ namespace Gamestore.Controllers
             Genre? genre = null;
 
             if (id != null)
-                genre ??= await _ctx.Genres.FindAsync(id);
+                genre ??= await _genreService.Get(id.Value);
 
-            name = name?.Capitalize();
             if (name != null)
-                genre ??= await _ctx.Genres.FirstOrDefaultAsync(g => g.Name == name);
+                genre ??= await _genreService.Get(name.Capitalize());
 
-            if(genre == null)
+            if (genre == null)
                 return Results.BadRequest();
 
             return Results.Ok(genre);
@@ -57,7 +52,9 @@ namespace Gamestore.Controllers
         [ProducesResponseType(typeof(IEnumerable<string>), StatusCodes.Status200OK)]
         public async Task<IResult> GetAllGenres()
         {
-            return Results.Ok(await _ctx.Genres.Select(g => g.Name).ToArrayAsync());
+            var lst = await _genreService.GetAll();
+
+            return Results.Ok(lst);
         }
 
         [HttpDelete("delete")]
@@ -68,9 +65,7 @@ namespace Gamestore.Controllers
             int deleted = 0;
             try
             {
-                deleted = await _ctx.Genres
-                .Where(u => u.Id == id)
-                .ExecuteDeleteAsync();
+                deleted = await _genreService.Delete(id);
             }
             catch (DbException ex)
             when (ex is Npgsql.PostgresException pgEx && pgEx.SqlState.Equals(Npgsql.PostgresErrorCodes.ForeignKeyViolation))

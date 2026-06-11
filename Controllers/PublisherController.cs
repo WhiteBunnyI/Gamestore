@@ -1,5 +1,6 @@
 ﻿using Gamestore.Extensions;
 using Gamestore.Models;
+using Gamestore.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Data.Common;
@@ -11,8 +12,14 @@ namespace Gamestore.Controllers
     {
         protected override string Entity => "Издатель";
 
-        public PublisherController(DbCtx db, ILogger<PublisherController> logger) : base(db, logger)
+        private CountryService _countryService;
+        private PublisherService _publisherService;
+
+        public PublisherController(DbCtx db, ILogger<PublisherController> logger, 
+            CountryService countryService, PublisherService publisherService) : base(db, logger)
         {
+            _countryService = countryService;
+            _publisherService = publisherService;
         }
 
         [HttpPost("add")]
@@ -20,17 +27,13 @@ namespace Gamestore.Controllers
         [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
         public async Task<IResult> AddPublisher([FromBody] Publisher.PublisherDto dto)
         {
-            string pubName = dto.PublisherName.Capitalize();
-            string countryName = dto.CountryName.Capitalize();
+            dto.PublisherName = dto.PublisherName.Capitalize();
+            dto.CountryName = dto.CountryName.Capitalize();
 
-            if (await _ctx.Countries.FirstOrDefaultAsync(c => c.Name == countryName) is not Country country)
-                return Results.BadRequest(NOT_FOUND_EXACT_MESSAGE($"Страна {countryName}"));
+            if (await _countryService.Get(dto.CountryName) is not Country country)
+                return Results.BadRequest(NOT_FOUND_EXACT_MESSAGE($"Страна {dto.CountryName}"));
 
-            int added = await _ctx.Publishers
-                .Upsert(new Publisher { Name = pubName, CountryId = country.Id })
-                .On(p => p.Name)
-                .NoUpdate()
-                .RunAsync();
+            int added = await _publisherService.Add(new Publisher { Name = dto.PublisherName, CountryId = country.Id});
 
             if (added == 0)
                 return Results.BadRequest(CONFLICT_AUTO_MESSAGE);
@@ -46,11 +49,11 @@ namespace Gamestore.Controllers
             Publisher? pub = null;
 
             if (id != null)
-                pub ??= await _ctx.Publishers.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id);
+                pub ??= await _publisherService.Get(id.Value);
 
             name = name?.Capitalize();
             if (name != null)
-                pub ??= await _ctx.Publishers.AsNoTracking().FirstOrDefaultAsync(p => p.Name == name);
+                pub ??= await _publisherService.Get(name);
 
             if (pub == null)
                 return Results.BadRequest(NOT_FOUND_AUTO_MESSAGE);
@@ -66,9 +69,7 @@ namespace Gamestore.Controllers
             int deleted = 0;
             try
             {
-                deleted = await _ctx.Publishers
-                .Where(u => u.Id == id)
-                .ExecuteDeleteAsync();
+                deleted = await _publisherService.Delete(id);
             }
             catch (DbException ex)
             when (ex is Npgsql.PostgresException pgEx && pgEx.SqlState.Equals(Npgsql.PostgresErrorCodes.ForeignKeyViolation))

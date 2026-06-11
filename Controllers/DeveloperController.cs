@@ -1,5 +1,6 @@
 ﻿using Gamestore.Extensions;
 using Gamestore.Models;
+using Gamestore.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Data.Common;
@@ -11,8 +12,14 @@ public class DeveloperController : AppControllerBase
 {
     protected override string Entity => "Разработчик";
 
-    public DeveloperController(DbCtx db, ILogger<DeveloperController> logger) : base(db, logger)
+    private CountryService _countryService;
+    private DeveloperService _developerService;
+
+    public DeveloperController(DbCtx db, ILogger<DeveloperController> logger,
+        CountryService countryService, DeveloperService developerService) : base(db, logger)
     {
+        _countryService = countryService;
+        _developerService = developerService;
     }
 
     [HttpPost("add")]
@@ -20,14 +27,10 @@ public class DeveloperController : AppControllerBase
     [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
     public async Task<IResult> AddDeveloper([FromBody] Developer.DeveloperDto dto)
     {
-        if (await _ctx.Countries.FirstOrDefaultAsync(c => c.Name.Equals(dto.CountryName.Capitalize())) is not Country country)
+        if (await _countryService.Get(dto.CountryName) is not Country country)
             return Results.BadRequest(NOT_FOUND_EXACT_MESSAGE("Страна"));
 
-        int added = await _ctx.Developers
-            .Upsert(new Developer { Name = dto.DeveloperName, CountryId = country.Id })
-            .On(d => d.Name)
-            .NoUpdate()
-            .RunAsync();
+        int added = await _developerService.Add(new Developer { Name = dto.DeveloperName, CountryId = country.Id});
 
         if (added == 0)
             return Results.BadRequest(CONFLICT_AUTO_MESSAGE);
@@ -41,10 +44,11 @@ public class DeveloperController : AppControllerBase
     public async Task<IResult> GetDeveloper(int? id, string? name)
     {
         Developer? dev = null;
+
         if (id != null)
-            dev ??= await _ctx.Developers.FindAsync(id);
+            dev ??= await _developerService.Get(id.Value);
         if(name != null)
-            dev ??= await _ctx.Developers.FirstOrDefaultAsync(d => d.Name.Equals(name));
+            dev ??= await _developerService.Get(name);
 
         if (dev == null)
             return Results.BadRequest(NOT_FOUND_AUTO_MESSAGE);
@@ -60,9 +64,7 @@ public class DeveloperController : AppControllerBase
         int deleted;
         try
         {
-            deleted = await _ctx.Developers
-            .Where(u => u.Id == id)
-            .ExecuteDeleteAsync();
+            deleted = await _developerService.Delete(id);
         }
         catch (DbException ex)
         when (ex is Npgsql.PostgresException pgEx && pgEx.SqlState.Equals(Npgsql.PostgresErrorCodes.ForeignKeyViolation))
