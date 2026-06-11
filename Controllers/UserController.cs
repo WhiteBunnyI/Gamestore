@@ -1,8 +1,11 @@
 ﻿using Gamestore.Models;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Data.Common;
-using System.Diagnostics;
+using System.Security.Claims;
 
 namespace Gamestore.Controllers
 {
@@ -11,7 +14,7 @@ namespace Gamestore.Controllers
     {
         protected override string Entity => "Пользователь";
 
-        public UsersController(DbCtx db, ILogger<UsersController> logger) : base(db, logger) { }
+        public UsersController(DbCtx db, ILogger<UsersController> logger) : base(db, logger) {  }
 
         [HttpPost("add")]
         [ProducesResponseType(typeof(User), StatusCodes.Status200OK)]
@@ -58,17 +61,23 @@ namespace Gamestore.Controllers
             int changed = await _ctx.Users.Where(u => u.Login == login)
                 .ExecuteUpdateAsync(s => s.SetProperty(u => u.Wallet, u => u.Wallet + value));
 
-            if(changed == 0)
+            if (changed == 0)
                 return Results.BadRequest(NOT_FOUND_AUTO_MESSAGE);
 
             return Results.Ok();
         }
 
+        [Authorize]
         [HttpDelete("delete")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
-        public async Task<IResult> DeleteUser(int id)
+        public async Task<IResult> DeleteUser()
         {
+            if (User.Identity == null)
+                return Results.Unauthorized();
+
+            var id = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
             int deleted = 0;
             try
             {

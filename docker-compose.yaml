@@ -18,6 +18,7 @@ services:
     environment:
       - DbSettings__password=${POSTGRESPASS}
       - ASPNETCORE_ENVIRONMENT=${ASP_ENV}
+      - AuthSettings__SecretKey=${SECRET_KEY}
     ports:
       - 4344:8080
     depends_on:

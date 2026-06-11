@@ -6,7 +6,7 @@ using System.Data.Common;
 namespace Gamestore.Controllers;
 
 [ApiController]
-public abstract class AppControllerBase
+public abstract class AppControllerBase : ControllerBase
 {
     protected readonly DbCtx _ctx;
     protected readonly ILogger _logger;
@@ -28,7 +28,7 @@ public abstract class AppControllerBase
     {
         _ctx = db;
         _logger = logger;
-
+        
         NOT_FOUND_AUTO_MESSAGE = NOT_FOUND_EXACT_MESSAGE(Entity);
         SUCCESS_AUTO_MESSAGE = SUCCESS_EXACT_MESSAGE(Entity);
         CONFLICT_AUTO_MESSAGE = CONFLICT_EXACT_MESSAGE(Entity);

@@ -1,10 +1,15 @@
 using Gamestore.Models;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 namespace Gamestore
 {
     public class Program
     {
+        public static byte[] SECRET_KEY_BYTES => Encoding.UTF8.GetBytes(SECRET_KEY);
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
@@ -14,7 +19,7 @@ namespace Gamestore
             builder.Services.AddControllers();
 
             //Add postgresql
-
+            
             var init = builder.Configuration["DbSettings:init"];
             var password = builder.Configuration["DbSettings:password"];
             string connectionString = $"{init};Password={password}";
@@ -22,6 +27,30 @@ namespace Gamestore
             builder.Services.AddDbContextPool<DbCtx>(options => options.UseNpgsql(connectionString));
             builder.Services.AddHealthChecks().AddDbContextCheck<DbCtx>();
             builder.Services.AddSwaggerGen();
+
+            var secretKey = builder.Configuration["AuthSettings:SecretKey"];
+            if (secretKey == null || secretKey.Length == 0)
+                throw new ApplicationException("Не найден секретный ключ или он пустой!");
+
+            var jwtIssuer = builder.Configuration["AuthSettings:Issuer"];
+            var jwtAudience = builder.Configuration["AuthSettings:Audience"];
+
+            builder.Services.AddAuthorization();
+            builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                .AddJwtBearer(options =>
+                {
+                    options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters()
+                    {
+                        ValidateIssuer = true,
+                        ValidateAudience = true,
+                        ValidateLifetime = true,
+                        ValidateIssuerSigningKey = true,
+
+                        ValidIssuer = jwtIssuer,
+                        ValidAudience = jwtAudience,
+                        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
+                    };
+                });
 
             var app = builder.Build();
 
@@ -39,6 +68,7 @@ namespace Gamestore
 
             app.UseRouting();
 
+            app.UseAuthentication();
             app.UseAuthorization();
 
             app.MapRazorPages();
