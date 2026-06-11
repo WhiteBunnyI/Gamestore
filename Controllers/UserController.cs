@@ -20,6 +20,7 @@ namespace Gamestore.Controllers
         [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
         public async Task<IResult> AddUser([FromBody] User.UserDto dto)
         {
+
             int added = await _userService.Add(new User() { Login = dto.Login });
 
             if (added == 0)
@@ -61,13 +62,12 @@ namespace Gamestore.Controllers
             return Results.Ok();
         }
 
-        [Authorize]
         [HttpDelete("delete")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
         public async Task<IResult> DeleteUser()
         {
-            var id = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            //var id = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
             int deleted = 0;
             try

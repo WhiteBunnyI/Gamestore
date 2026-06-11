@@ -55,6 +55,7 @@ public class AuthController : AppControllerBase
     [HttpPut("logout")]
     public async Task<IResult> Logout()
     {
-        var id = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var id = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        throw new NotImplementedException();
     }
 }
