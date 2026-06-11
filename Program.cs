@@ -1,8 +1,9 @@
+using Gamestore.Extensions;
 using Gamestore.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
 using System.Text;
 
 namespace Gamestore
@@ -18,14 +19,28 @@ namespace Gamestore
             builder.Services.AddControllers();
 
             //Add postgresql
-            
+
             var init = builder.Configuration["DbSettings:init"];
             var password = builder.Configuration["DbSettings:password"];
             string connectionString = $"{init};Password={password}";
 
             builder.Services.AddDbContextPool<DbCtx>(options => options.UseNpgsql(connectionString));
+            builder.Services.AddGamestoreServices();
             builder.Services.AddHealthChecks().AddDbContextCheck<DbCtx>();
-            builder.Services.AddSwaggerGen();
+            builder.Services.AddSwaggerGen(c =>
+            {
+                c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+                {
+                    Name = "Authorization",
+                    Type = SecuritySchemeType.Http,
+                    Scheme = "Bearer",
+                    BearerFormat = "JWT",
+                    In = ParameterLocation.Header,
+                    Description = "¬ведите ваш JWT токен."
+                });
+
+                c.OperationFilter<AuthorizeCheckOperationFilter>();
+            });
 
             var secretKey = builder.Configuration["AuthSettings:SecretKey"];
             if (secretKey == null || secretKey.Length == 0)
@@ -38,7 +53,7 @@ namespace Gamestore
             builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 .AddJwtBearer(options =>
                 {
-                    options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters()
+                    options.TokenValidationParameters = new TokenValidationParameters()
                     {
                         ValidateIssuer = true,
                         ValidateAudience = true,

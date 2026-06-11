@@ -13,7 +13,10 @@ namespace Gamestore.Controllers
         protected override string Entity => "Пользователь";
         private UserService _userService;
 
-        public UsersController(DbCtx db, ILogger<UsersController> logger, UserService userService) : base(db, logger) { _userService = userService; }
+        public UsersController(DbCtx db, ILogger<UsersController> logger, UserService userService) : base(db, logger)
+        {
+            _userService = userService;
+        }
 
         [HttpPost("add")]
         [ProducesResponseType(typeof(User), StatusCodes.Status200OK)]
@@ -62,17 +65,19 @@ namespace Gamestore.Controllers
             return Results.Ok();
         }
 
+        [Authorize(Roles = "Admin, User")]
         [HttpDelete("delete")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
-        public async Task<IResult> DeleteUser()
+        public async Task<IResult> DeleteUser(int? id)
         {
-            //var id = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            if(!User.FindAll(ClaimTypes.Role).Any(c => c.Value == "Admin"))
+                id = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
             int deleted = 0;
             try
             {
-                deleted = await _userService.Delete(id);
+                deleted = await _userService.Delete(id!.Value);
             }
             catch (DbException ex)
             when (ex is Npgsql.PostgresException pgEx && pgEx.SqlState.Equals(Npgsql.PostgresErrorCodes.ForeignKeyViolation))

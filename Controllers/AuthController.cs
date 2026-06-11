@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -26,15 +27,32 @@ public class AuthController : AppControllerBase
     {
         //Проверка логина и пароля
         //Пока только проверка логина
-        if (await _ctx.Users.Where(u => u.Login == login).FirstOrDefaultAsync() is not User user)
-            return Results.Unauthorized();
+        string adminLogin = "Admin";
 
-        var claims = new List<Claim>()
+        List<Claim> claims = null!;
+        if (login == adminLogin)
         {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Name, user.Login),
-            new Claim(ClaimTypes.Role, "User"),
-        };
+            claims = new List<Claim>()
+            {
+                new Claim(ClaimTypes.Name, login),
+                new Claim(ClaimTypes.Role, "User"),
+                new Claim(ClaimTypes.Role, "Admin"),
+            };
+        }
+
+        if (claims == null)
+        {
+            if (await _ctx.Users.Where(u => u.Login == login).FirstOrDefaultAsync() is not User user)
+                return Results.Unauthorized();
+
+            claims = new List<Claim>()
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Name, user.Login),
+                new Claim(ClaimTypes.Role, "User"),
+            };
+        }
+
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["AuthSettings:SecretKey"]!));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
