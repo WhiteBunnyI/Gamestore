@@ -1,10 +1,12 @@
 ﻿using Gamestore.Models;
+using Gamestore.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
+using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using System.Text;
 
@@ -14,66 +16,64 @@ namespace Gamestore.Controllers;
 public class AuthController : AppControllerBase
 {
     private IConfiguration _config;
-    public AuthController(DbCtx db, ILogger<AuthController> logger, IConfiguration configuration) : base(db, logger)
+    private AuthService _authService;
+    public AuthController(DbCtx db, ILogger<AuthController> logger, IConfiguration configuration, AuthService authService) : base(db, logger)
     {
         _config = configuration;
+        _authService = authService;
     }
 
     protected override string Entity => "Authentication";
 
+    [HttpGet("refresh")]
+    public IResult Refresh(string refreshString)
+    {
+        var remoteIpAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        _logger.LogInformation("Trying to refresh with {refstr} with {ip}", refreshString, remoteIpAddress);
+
+        if (string.IsNullOrEmpty(remoteIpAddress))
+            return Results.BadRequest();
+
+        var accessString = _authService.Refresh(refreshString, remoteIpAddress);
+        if (string.IsNullOrEmpty(accessString))
+            return Results.BadRequest();
+
+        return Results.Ok(accessString);
+    }
 
     [HttpGet("login")]
-    public async Task<IResult> Login(string login)
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IResult> Login(string login, string password)
     {
-        //Проверка логина и пароля
+        User user = new() { Id = -1, Login = login };
         //Пока только проверка логина
-        string adminLogin = "Admin";
-
-        List<Claim> claims = null!;
-        if (login == adminLogin)
+        if (login != AuthService.AdminLogin)
         {
-            claims = new List<Claim>()
-            {
-                new Claim(ClaimTypes.Name, login),
-                new Claim(ClaimTypes.Role, "User"),
-                new Claim(ClaimTypes.Role, "Admin"),
-            };
-        }
-
-        if (claims == null)
-        {
-            if (await _ctx.Users.Where(u => u.Login == login).FirstOrDefaultAsync() is not User user)
+            User? _user = await _ctx.Users.Where(u => u.Login == login).FirstOrDefaultAsync();
+            if (_user == null)
                 return Results.Unauthorized();
-
-            claims = new List<Claim>()
-            {
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Name, user.Login),
-                new Claim(ClaimTypes.Role, "User"),
-            };
+            user = _user;
         }
 
+        var remoteIpAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        if (remoteIpAddress == null)
+            return Results.BadRequest();
+        var (access, refresh) = _authService.Login(user, password, remoteIpAddress);            
 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["AuthSettings:SecretKey"]!));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-        var token = new JwtSecurityToken(
-            issuer: _config["AuthSettings:Issuer"],
-            audience: _config["AuthSettings:Audience"],
-            claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(10),
-            signingCredentials: creds
-            );
-
-        var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
-        return Results.Ok(tokenString);
+        return Results.Ok(new { AccessToken = access, RefreshToken = refresh });
     }
 
     [Authorize]
     [HttpPut("logout")]
-    public async Task<IResult> Logout()
+    public IResult Logout()
     {
-        var id = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        throw new NotImplementedException();
+        string jti = User.FindFirstValue(JwtRegisteredClaimNames.Jti)!;
+        long exp = long.Parse(User.FindFirstValue("exp")!);
+
+        _authService.AddToBlacklist(jti, exp);
+
+        return Results.Ok();
     }
 }

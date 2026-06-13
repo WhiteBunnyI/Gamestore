@@ -1,6 +1,7 @@
 using Gamestore.Extensions;
 using Gamestore.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
@@ -77,12 +78,19 @@ namespace Gamestore
                 app.MapHealthChecks("/health");
             }
 
+            // 1. Ќастраиваем обработку заголовков от ngrok
+            app.UseForwardedHeaders(new ForwardedHeadersOptions
+            {
+                ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+            });
+
             app.UseHttpsRedirection();
             app.UseStaticFiles();
 
             app.UseRouting();
 
             app.UseAuthentication();
+            app.UseAuthBlacklist();
             app.UseAuthorization();
 
             app.MapRazorPages();

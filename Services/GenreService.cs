@@ -1,6 +1,7 @@
 ﻿using Gamestore.Extensions;
 using Gamestore.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Collections;
 
 
 namespace Gamestore.Services;
@@ -33,6 +34,9 @@ public class GenreService
     public async Task<Genre?> Get(string name) => await _ctx.Genres
         .Where(g => g.Name == name.Capitalize())
         .FirstOrDefaultAsync();
+    public async Task<List<Genre>> Get(IEnumerable<int> ids) => await _ctx.Genres
+        .Where(g => ids.Contains(g.Id))
+        .ToListAsync();
 
     public async Task<int> Delete(int id) => await _ctx.Genres
         .Where(g => g.Id == id)

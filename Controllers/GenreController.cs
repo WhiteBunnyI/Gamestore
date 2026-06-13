@@ -1,6 +1,7 @@
 using Gamestore.Extensions;
 using Gamestore.Models;
 using Gamestore.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Data.Common;
@@ -57,6 +58,7 @@ namespace Gamestore.Controllers
             return Results.Ok(lst);
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpDelete("delete")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
@@ -70,7 +72,7 @@ namespace Gamestore.Controllers
             catch (DbException ex)
             when (ex is Npgsql.PostgresException pgEx && pgEx.SqlState.Equals(Npgsql.PostgresErrorCodes.ForeignKeyViolation))
             {
-                return Results.BadRequest(FOREIGN_KEY_VIOLATION_MESSAGE);
+                return Results.BadRequest(FOREIGN_KEY_VIOLATION_REFERENCE_MESSAGE);
             }
 
             if (deleted == 0) 

@@ -1,5 +1,6 @@
 ﻿using Gamestore.Models;
 using Gamestore.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Data.Common;
 
@@ -26,7 +27,7 @@ public class CountryController : AppControllerBase
         if (added == 0)
             return Results.BadRequest(CONFLICT_AUTO_MESSAGE);
 
-        return Results.Ok();
+        return Results.Ok(SUCCESS_ADDED_AUTO_MESSAGE);
     }
 
     [HttpGet("get")]
@@ -47,6 +48,7 @@ public class CountryController : AppControllerBase
         return Results.Ok(country);
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpDelete("delete")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
@@ -60,7 +62,7 @@ public class CountryController : AppControllerBase
         catch (DbException ex)
         when (ex is Npgsql.PostgresException pgEx && pgEx.SqlState.Equals(Npgsql.PostgresErrorCodes.ForeignKeyViolation))
         {
-            return Results.BadRequest(FOREIGN_KEY_VIOLATION_MESSAGE);
+            return Results.BadRequest(FOREIGN_KEY_VIOLATION_REFERENCE_MESSAGE);
         }
 
         if (deleted == 0)

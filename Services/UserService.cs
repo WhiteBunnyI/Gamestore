@@ -31,7 +31,7 @@ public class UserService
         return await _ctx.Users.Where(u => u.Login == login).FirstOrDefaultAsync();
     }
 
-    public async Task<int> DepositWallet(string login, float amount)
+    public async Task<int> ChangeWallet(string login, float amount)
     {
         return await _ctx.Users
                 .Where(u => u.Login == login)

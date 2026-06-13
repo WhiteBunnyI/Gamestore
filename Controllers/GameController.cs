@@ -1,8 +1,9 @@
 using Gamestore.Models;
 using Gamestore.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Text;
+using System.Security.Claims;
 
 namespace Gamestore.Controllers;
 
@@ -18,7 +19,7 @@ public class GameController : AppControllerBase
     private GameService _gameService;
 
     public GameController(DbCtx db, ILogger<GameController> logger,
-        PublisherService publisherService, GameService gameService, 
+        PublisherService publisherService, GameService gameService,
         GenreService genreService, DeveloperService developerService,
         UserService userService) : base(db, logger)
     {
@@ -66,57 +67,20 @@ public class GameController : AppControllerBase
 
         if (gameDto.Developers.Count > 0)
         {
-            /* 
-            StringBuilder sb = new StringBuilder();
-            foreach (var devChunk in gameDto.Developers.Chunk(500))
+            await Task.Run(async () =>
             {
-                foreach (var dev in devChunk)
-                {
-                    if (sb.Length != 0)
-                        sb.Append(", ");
-                    sb.Append($"({game.Id}, {dev})");
-                }
-
-                tasks.Add(_ctx.Database.ExecuteSqlInterpolatedAsync($@"
-                            INSERT INTO gamestore.game_developer (game_id, developer_id)
-                            SELECT s.devId, s.gameId 
-                            FROM (VALUES {sb.ToString()})
-                            WHERE EXIST (SELECT 1 FROM gamestore.developer d WHERE d.id = s.devId)
-                            ON CONFLICT (game_id, developer_id) DO NOTHING;"));
-            }
-            */
-
-            //Validating
-            gameDto.Developers = await _ctx.Developers
-                .Where(d => gameDto.Developers.Contains(d.Id))
-                .Select(d => d.Id)
-                .ToArrayAsync();
-
-            var devsList = gameDto.Developers
-                .Select(d => new GameDeveloper { DeveloperId = d, GameId = game.Id })
-                .ToList();
-
-            tasks.Add(_ctx.GameDevelopers.UpsertRange(devsList)
-                .On(gd => new { gd.DeveloperId, gd.GameId })
-                .NoUpdate()
-                .RunAsync());
+                var developers = await _developerService.Get(gameDto.Developers);
+                return await _gameService.AddDevelopers(game, developers);
+            });
         }
 
         if (gameDto.Genres.Count > 0)
         {
-            gameDto.Genres = await _ctx.Genres
-                .Where(g => gameDto.Genres.Contains(g.Id))
-                .Select(g => g.Id)
-                .ToArrayAsync();
-
-            var genList = gameDto.Genres
-                .Select(g => new GameGenre { GenreId = g, GameId = game.Id })
-                .ToList();
-
-            tasks.Add(_ctx.GameGenres.UpsertRange(genList)
-                .On(gg => new { gg.GenreId, gg.GameId })
-                .NoUpdate()
-                .RunAsync());
+            await Task.Run(async () =>
+            {
+                var genres = await _genreService.Get(gameDto.Genres);
+                return await _gameService.AddGenres(game, genres);
+            });
         }
 
         await Task.WhenAll(tasks);
@@ -137,11 +101,11 @@ public class GameController : AppControllerBase
         else if (added < counts[1])
             textError += "Не удалось добавить некоторые жанры! Проверьте id и добавьте их вручную! ";
 
-        if(textError.Length != 0)
+        if (textError.Length != 0)
             return Results.Ok(textError);
 
 
-        return Results.Ok();
+        return Results.Ok(SUCCESS_ADDED_AUTO_MESSAGE);
     }
 
     private async Task<Game?> GetGameObj(int? id, string? title)
@@ -170,51 +134,36 @@ public class GameController : AppControllerBase
         return Results.Ok(game);
     }
 
-    [HttpPost("buy")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IResult> BuyGame(string login, int gameId)
-    {
-        _logger.LogInformation("Пользователь {Login} хочет купить игру {GameId}", login, gameId);
-
-        using var transaction = await _ctx.Database.BeginTransactionAsync();
-
-        if (await _userService.Get(login) is not User user)
-            return Results.BadRequest(NOT_FOUND_EXACT_MESSAGE($"Пользователь {login}"));
-
-        if (await _gameService.Get(gameId) is not Game game)
-            return Results.BadRequest(NOT_FOUND_EXACT_MESSAGE($"Игра с id: {gameId}"));
-
-        int gameAdded = await _ctx.GameUsers
-            .Upsert(new GameUser { UserId = user.Id, GameId = gameId, Price = game.Price, DatePurchase = DateOnly.FromDateTime(DateTime.UtcNow) })
-            .On(gu => new { gu.UserId, gu.GameId })
-            .NoUpdate()
-            .RunAsync();
-
-        if (gameAdded == 0)
-            return Results.Conflict($"Пользователь {login} уже приобрел игру {game.Title}");
-
-        var check = await _ctx.Users
-            .Where(u => u.Login == login && u.Wallet >= game.Price)
-            .ExecuteUpdateAsync(s => s.SetProperty(u => u.Wallet, u => u.Wallet - game.Price));
-
-        if (check == 0)
-            return Results.BadRequest($"На балансе пользователя {login} недостаточно средств!");
-
-        await transaction.CommitAsync();
-        return Results.Ok($"Пользователь {login} успешно приобрел игру {game.Title}!");
-    }
-
+    [Authorize(Roles = "Admin")]
     [HttpDelete("delete")]
     public async Task<IResult> DeleteGame(int id)
     {
         //Удаляем ссылки со смежных таблиц
         //Удаляем саму игру
 
+        using var transaction = await _ctx.Database.BeginTransactionAsync();
 
+        var game = await _gameService.Get(id);
+        if (game == null)
+            return Results.BadRequest(NOT_FOUND_AUTO_MESSAGE);
 
-        throw new NotImplementedException();
+        List<Task> tasks = new List<Task>()
+        {
+            _gameService.RemoveAllDevelopers(game),
+            _gameService.RemoveAllGenres(game),
+            _gameService.RemoveAllVersions(game)
+        };
+
+        await Task.WhenAll(tasks);
+
+        int removed = await _gameService.Delete(game.Id);
+
+        if (removed == 0)
+            return Results.BadRequest("Данная игра содержится в библиотеках пользователей");
+
+        await transaction.CommitAsync();
+
+        return Results.Ok();
     }
 
 
@@ -228,21 +177,17 @@ public class GameController : AppControllerBase
         if (game == null)
             return Results.BadRequest(NOT_FOUND_AUTO_MESSAGE);
 
-        var gameDevs = developersId.Select(id => new GameDeveloper() { DeveloperId = id, GameId = game.Id }).ToList();
+        var devList = await _developerService.Get(developersId);
 
-        int added = await _ctx.GameDevelopers
-            .UpsertRange(gameDevs)
-            .On(gd => new { gd.DeveloperId, gd.GameId })
-            .NoUpdate()
-            .RunAsync();
+        int added = await _gameService.AddDevelopers(game, devList);
 
         if (added == 0)
             return Results.BadRequest("Разработчики не были добавлены! Проверьте id");
 
-        if (added < gameDevs.Count)
+        if (added < developersId.Count)
             return Results.BadRequest("Не все разработчики были добавлены! Проверьте id");
 
-        return Results.Ok();
+        return Results.Ok(SUCCESS_ADDED_EXACT_MESSAGE("Разработчик"));
     }
 
     [HttpGet("get-developers")]
@@ -256,16 +201,34 @@ public class GameController : AppControllerBase
         if (game == null)
             return Results.BadRequest(NOT_FOUND_AUTO_MESSAGE);
 
-        var devs = await _ctx.GameDevelopers
-            .Where(gd => gd.GameId == game.Id)
-            .Include(gd => gd.Developer)
-            .Select(gd => gd.Developer.Name)
-            .ToListAsync();
+        var devs = await _gameService.GetDevelopers(game);
 
         if (devs == null)
             return Results.NotFound("У игры нет разработчиков");
 
-        return Results.Ok(devs);
+        return Results.Ok(devs.Select(d => d.Id));
+    }
+
+    [HttpPost("add-genres")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IResult> AddGameGenres(int? id, string? title, [FromBody] List<int> genreIds)
+    {
+        var game = await GetGameObj(id, title);
+
+        if (game == null)
+            return Results.BadRequest(NOT_FOUND_AUTO_MESSAGE);
+
+        var genList = await _genreService.Get(genreIds);
+        int added = await _gameService.AddGenres(game, genList);
+        if (added == 0)
+            return Results.BadRequest("Жанры не были добавлены! Проверьте id");
+
+        if (added < genreIds.Count)
+            return Results.BadRequest("Не все жанры были добавлены! Проверьте id");
+
+        return Results.Ok(SUCCESS_ADDED_EXACT_MESSAGE("Жанр"));
     }
 
     [HttpGet("get-genres")]
@@ -279,16 +242,12 @@ public class GameController : AppControllerBase
         if (game == null)
             return Results.BadRequest(NOT_FOUND_AUTO_MESSAGE);
 
-        var genres = await _ctx.GameGenres
-            .Where(gg => gg.GameId == game.Id)
-            .Include(gg => gg.Genre)
-            .Select(gg => gg.Genre.Name)
-            .ToListAsync();
+        var genres = await _gameService.GetGenres(game);
 
         if (genres == null)
             return Results.NotFound("У игры нет жанров");
 
-        return Results.Ok(genres);
+        return Results.Ok(genres.Select(g => g.Name));
     }
 
     [HttpGet("get-publisher")]
@@ -315,6 +274,30 @@ public class GameController : AppControllerBase
         return Results.Ok(game.Publisher);
     }
 
+
+    [HttpPost("add-version")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IResult> AddGameVersion(int? id, string? title, GameVersion.VersionDto dto)
+    {
+        var game = await GetGameObj(id, title);
+
+        if (game == null)
+            return Results.BadRequest(NOT_FOUND_AUTO_MESSAGE);
+
+        GameVersion gameVersion = new GameVersion()
+        {
+            GameId = game.Id,
+            Description = dto.Description,
+            DateRelease = DateOnly.FromDateTime(DateTime.UtcNow)
+        };
+
+        await _gameService.AddVersion(gameVersion);
+
+        return Results.Ok();
+    }
+
     [HttpGet("get-version-history")]
     [ProducesResponseType(typeof(IEnumerable<GameVersion>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -331,7 +314,7 @@ public class GameController : AppControllerBase
             .LoadAsync();
 
         if (game.GameVersions == null)
-            return Results.NotFound("У игры нет истории версий");
+            return Results.NotFound(NOT_FOUND_EXACT_MESSAGE("История"));
 
         return Results.Ok(game.GameVersions);
     }
@@ -354,10 +337,73 @@ public class GameController : AppControllerBase
             .FirstOrDefaultAsync();
 
         if (version == null)
-            return Results.NotFound("У игры нет истории версий");
+            return Results.NotFound(NOT_FOUND_EXACT_MESSAGE("История"));
 
         return Results.Ok(version);
     }
 
 
+    [Authorize(Roles = "User")]
+    [HttpPost("buy")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IResult> BuyGame(int gameId)
+    {
+        var login = User.FindFirstValue(ClaimTypes.Name);
+
+        if (string.IsNullOrEmpty(login))
+            return Results.Unauthorized();
+
+        _logger.LogInformation("Пользователь {Login} хочет купить игру {GameId}", login, gameId);
+
+        using var transaction = await _ctx.Database.BeginTransactionAsync();
+
+        if (await _userService.Get(login) is not User user)
+            return Results.BadRequest(NOT_FOUND_EXACT_MESSAGE($"Пользователь {login}"));
+
+        if (await _gameService.Get(gameId) is not Game game)
+            return Results.BadRequest(NOT_FOUND_EXACT_MESSAGE($"Игра с id: {gameId}"));
+
+        GameUser gameUser = new GameUser
+        {
+            UserId = user.Id,
+            GameId = gameId,
+            Price = game.Price,
+            DatePurchase = DateOnly.FromDateTime(DateTime.UtcNow)
+        };
+
+        int gameAdded = await _gameService.AddGameToUser(gameUser);
+
+        if (gameAdded == 0)
+            return Results.Conflict($"Пользователь {login} уже приобрел игру {game.Title}");
+
+        var check = await _ctx.Users
+            .Where(u => u.Login == login && u.Wallet >= game.Price)
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.Wallet, u => u.Wallet - game.Price));
+
+        if (check == 0)
+            return Results.BadRequest($"На балансе пользователя {login} недостаточно средств!");
+
+        await transaction.CommitAsync();
+
+        _logger.LogInformation("Пользователь {Login} успешно купил игру {Title}", login, game.Title);
+
+        return Results.Ok($"Пользователь {login} успешно приобрел игру {game.Title}!");
+    }
+
+    [HttpGet("get-library")]
+    [ProducesResponseType(typeof(ICollection<int>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IResult> GetUserLibrary(int userId)
+    {
+        User? user = await _userService.Get(userId);
+        if (user == null)
+            return Results.NotFound(NOT_FOUND_EXACT_MESSAGE("Пользователь"));
+
+        var gameList = await _gameService.GetUserGames(user);
+
+        return Results.Ok(gameList.Select(g => g.Id));
+    }
 }

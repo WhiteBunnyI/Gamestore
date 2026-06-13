@@ -7,6 +7,13 @@ namespace Gamestore.Models;
 [Table("game_version", Schema = "gamestore")]
 public class GameVersion
 {
+    public class VersionDto
+    {
+        [Required]
+        [StringLength(2000)]
+        public string Description { get; set; } = null!;
+    }
+
     [Key]
     [Column("id")]
     public int Id { get; set; }
@@ -18,6 +25,7 @@ public class GameVersion
     public DateOnly DateRelease { get; set; }
 
     [Column("description")]
+    [StringLength(2000)]
     public string Description { get; set; } = null!;
 
     [JsonIgnore]

@@ -29,7 +29,7 @@ namespace Gamestore.Controllers
             if (added == 0)
                 return Results.BadRequest(CONFLICT_AUTO_MESSAGE);
 
-            return Results.Ok(SUCCESS_AUTO_MESSAGE);
+            return Results.Ok(SUCCESS_ADDED_AUTO_MESSAGE);
         }
 
         [HttpGet("get")]
@@ -57,7 +57,7 @@ namespace Gamestore.Controllers
         {
             if (value <= 0) return Results.BadRequest("Сумма (value) должна быть неотрицательной");
 
-            int changed = await _userService.DepositWallet(login, value);
+            int changed = await _userService.ChangeWallet(login, value);
 
             if (changed == 0)
                 return Results.BadRequest(NOT_FOUND_AUTO_MESSAGE);
@@ -82,7 +82,7 @@ namespace Gamestore.Controllers
             catch (DbException ex)
             when (ex is Npgsql.PostgresException pgEx && pgEx.SqlState.Equals(Npgsql.PostgresErrorCodes.ForeignKeyViolation))
             {
-                return Results.BadRequest(FOREIGN_KEY_VIOLATION_MESSAGE);
+                return Results.BadRequest(FOREIGN_KEY_VIOLATION_REFERENCE_MESSAGE);
             }
 
             if (deleted == 0)

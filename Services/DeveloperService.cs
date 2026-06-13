@@ -2,6 +2,7 @@
 using Gamestore.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.VisualBasic;
+using System.Collections;
 
 namespace Gamestore.Services;
 
@@ -26,6 +27,12 @@ public class DeveloperService
     }
 
     public async Task<Developer?> Get(int id) => await _ctx.Developers.FindAsync(id);
+    public async Task<List<Developer>> Get(IEnumerable<int> ids)
+    {
+        return await _ctx.Developers
+            .Where(d => ids.Contains(d.Id))
+            .ToListAsync();
+    }
     public async Task<Developer?> Get(string name) => await _ctx.Developers
         .Where(d => d.Name == name.Capitalize())
         .FirstOrDefaultAsync();
