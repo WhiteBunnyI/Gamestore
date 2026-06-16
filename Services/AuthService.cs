@@ -23,6 +23,11 @@ public class AuthService
         _config = configuration;
     }
 
+    public User? GetUserByRefreshToken(string refreshToken)
+    {
+        return _refreshTokens[refreshToken].User;
+    }
+
     public (string access_token, string refresh_token) Login(User user, string password, string ipAddress)
     {
         //Пока без проверки пароля
@@ -118,7 +123,9 @@ public class AuthService
     }
 
 
-    public bool IsBlacklisted(string jti) => _jtiBlacklist.Where(c => c.jti.Equals(jti)).Any();
+    public bool IsBlacklisted(string access_jti) => _jtiBlacklist.Where(c => c.jti.Equals(access_jti)).Any();
+
+    public bool IsRefreshTokenRegistered(string refresh_token) => _refreshTokens.ContainsKey(refresh_token);
 
     public void CheckDateTime()
     {

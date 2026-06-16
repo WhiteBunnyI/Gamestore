@@ -1,0 +1,35 @@
+﻿@page
+@model Gamestore.Pages.ShopModel
+@{
+}
+
+<!-- Основной контент -->
+<div class="container mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold">Игры</h2>
+        <div id="cart" class="dropdown">
+            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                Корзина
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="#">По цене (возрастание)</a></li>
+                <li><a class="dropdown-item" href="#">По цене (убывание)</a></li>
+                <li><a class="dropdown-item" href="#">По популярности</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Сетка товаров -->
+    <div id="card-grid" class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-4">
+
+        
+    </div>
+</div>
+
+
+@section Scripts{
+    <script>
+        document.querySelector('#nav-page-shop').classList.add('active');
+    </script>
+    <script src="~/js/shop.js" asp-append-version="true"></script>
+}

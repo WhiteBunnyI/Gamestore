@@ -15,6 +15,9 @@ public class User
         [Required]
         [StringLength(30)]
         public string Login { get; set; } = null!;
+
+        [Required]
+        public string Password { get; set; } = null!;
     }
 
     [Key]

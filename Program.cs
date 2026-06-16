@@ -65,6 +65,16 @@ namespace Gamestore
                         ValidAudience = jwtAudience,
                         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
                     };
+
+                    options.Events = new JwtBearerEvents
+                    {
+                        OnAuthenticationFailed = context =>
+                        {
+                            // —юда бэкенд выведет точную причину (например, Expired или Invalid Signature)
+                            Console.WriteLine("ќшибка авторизации: " + context.Exception.Message);
+                            return Task.CompletedTask;
+                        }
+                    };
                 });
 
             var app = builder.Build();

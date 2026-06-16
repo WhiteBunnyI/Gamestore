@@ -5,46 +5,149 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - Gamestore</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/Gamestore.styles.css" asp-append-version="true" />
 </head>
 <body>
     <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
+        <!-- 1. HEADER (NAVBAR) -->
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
             <div class="container">
-                <a class="navbar-brand" asp-area="" asp-page="/Index">Gamestore</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Toggle navigation">
+                <!-- Логотип / Название -->
+                <a class="navbar-brand fw-bold" asp-page="/Index">Gamestore</a>
+
+                <!-- Кнопка гамбургер для мобильных устройств -->
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
                     <span class="navbar-toggler-icon"></span>
                 </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
+
+                <!-- Основное содержимое навбара -->
+                <div class="collapse navbar-collapse" id="navbarContent">
+                    <!-- Ссылки слева -->
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/Index">Home</a>
+                            <a id="nav-page-index" class="nav-link" asp-page="/Index">Главная</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/Privacy">Privacy</a>
+                            <a id="nav-page-shop" class="nav-link" asp-page="/Shop">Магазин</a>
                         </li>
                     </ul>
+
+                    <!-- Блок кнопок СПРАВА (Состояние: НЕ авторизован) -->
+                    <div class="d-flex gap-2 d-none" id="guest-buttons">
+                        <button class="btn btn-outline-light" data-bs-toggle="modal" data-bs-target="#authModal">
+                            Войти
+                        </button>
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#authModal">
+                            Создать профиль
+                        </button>
+                    </div>
+
+                    <!-- Блок кнопки СПРАВА (Состояние: АВТОРИЗОВАН, скрыт по умолчанию классом d-none) -->
+                    <div class="d-flex d-none" id="user-button">
+                        <button class="btn btn-outline-light d-flex align-items-center gap-2"
+                                data-bs-toggle="offcanvas" data-bs-target="#profileOffcanvas">
+                            <span>👤</span> Мой профиль
+                        </button>
+                    </div>
                 </div>
             </div>
         </nav>
     </header>
+
     <div class="container">
         <main role="main" class="pb-3">
             @RenderBody()
         </main>
     </div>
 
-    <footer class="border-top footer text-muted">
+    @* <footer class="border-top footer text-muted">
         <div class="container">
             &copy; 2026 - Gamestore - <a asp-area="" asp-page="/Privacy">Privacy</a>
         </div>
-    </footer>
+    </footer> *@
+
+    <!-- 2. MODAL (Форма входа/регистрации) -->
+    <div class="modal fade" id="authModal" tabindex="-1" aria-labelledby="authModalLabel" aria-hidden="true">
+        <!-- modal-dialog-centered выравнивает окно по вертикали -->
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="authModalLabel">Вход в аккаунт</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="loginForm">
+                        <div class="mb-3">
+                            <label for="loginInput" class="form-label">Логин</label>
+                            <input type="text" class="form-control" id="loginInput" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="passwordInput" class="form-label">Пароль</label>
+                            <input type="password" class="form-control" id="passwordInput" required>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Войти</button>
+                        </div>
+                    </form>
+                    <hr>
+                    <div class="d-flex justify-content-center">
+                        <p class="text-center mb-0 flex-row m-1">Нет аккаунта?</p>
+                        <button type="button" id="change-form" class="text-decoration-none flex-row">Зарегистрироваться</button>
+                    </div>
+                     
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- 3. OFFCANVAS (Боковая панель профиля) -->
+    <!-- offcanvas-end означает, что панель выезжает справа -->
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="profileOffcanvas" aria-labelledby="profileOffcanvasLabel">
+        <div class="offcanvas-header bg-light">
+            <h5 class="offcanvas-title" id="profileOffcanvasLabel">Личный кабинет</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Закрыть"></button>
+        </div>
+        <div class="offcanvas-body">
+            <!-- Информация о пользователе -->
+            <div class="text-center mb-4">
+                <img id="profile-icon" src="https://ui-avatars.com/api/?name=User+Name&background=0D6EFD&color=fff&size=128"
+                     class="rounded-circle profile-avatar mb-3 shadow-sm" alt="Аватар">
+                <h5 id="profile-login" class="mb-1">Иван Иванов</h5>
+                <p class="text-muted small d-none">ivan@example.com</p>
+                <span class="badge bg-success">Активен</span>
+                <span id="wallet" class="badge bg-info rounded-pill">Кошелек: 99.99$</span>
+            </div>
+
+            <!-- Навигация внутри профиля -->
+            <div class="list-group list-group-flush">
+                <a id="profile-profile" href="#" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
+                    👤 <span>Мой профиль</span>
+                </a>
+                <a id="profile-lib" href="#" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
+                    📦 <span>Мои игры</span>
+                </a>
+                <a id="profile-favorite" href="#" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
+                    💳 <span>Пополнить кошелек</span>
+                </a>
+                <a id="profile-settings" href="#" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
+                    ⚙️ <span>Настройки</span>
+                </a>
+
+                <!-- Кнопка выхода -->
+                <button id="logout-btn" class="list-group-item list-group-item-action text-danger d-flex align-items-center gap-2 border-0 mt-3">
+                    🚪 <span>Выйти из аккаунта</span>
+                </button>
+            </div>
+        </div>
+    </div>
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/auth.js" asp-append-version="true"></script>
+    <script src="~/js/notify.js" asp-append-version="true"></script>
 
     @await RenderSectionAsync("Scripts", required: false)
 </body>

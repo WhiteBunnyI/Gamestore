@@ -3,6 +3,7 @@ using Gamestore.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Data.Common;
 using System.Security.Claims;
 
 namespace Gamestore.Controllers;
@@ -30,6 +31,7 @@ public class GameController : AppControllerBase
         _userService = userService;
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPost("add")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
@@ -121,6 +123,13 @@ public class GameController : AppControllerBase
         return game;
     }
 
+    [HttpGet("get/{page}")]
+    public async Task<IResult> GetGame(int page)
+    {
+        int limitPerPage = 12;
+        return Results.Ok(await _gameService.Get(limitPerPage, limitPerPage * (page - 1)));
+    }
+
     [HttpGet("get")]
     [ProducesResponseType(typeof(Game), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -156,7 +165,16 @@ public class GameController : AppControllerBase
 
         await Task.WhenAll(tasks);
 
-        int removed = await _gameService.Delete(game.Id);
+        int removed = 0;
+        try
+        {
+            removed = await _gameService.Delete(game.Id);
+        }
+        catch (DbException ex)
+        when (ex is Npgsql.PostgresException pgEx && pgEx.SqlState.Equals(Npgsql.PostgresErrorCodes.ForeignKeyViolation))
+        {
+            return Results.BadRequest("Данная игра содержится в библиотеках пользователей");
+        }
 
         if (removed == 0)
             return Results.BadRequest("Данная игра содержится в библиотеках пользователей");
@@ -166,7 +184,7 @@ public class GameController : AppControllerBase
         return Results.Ok();
     }
 
-
+    [Authorize(Roles = "Admin")]
     [HttpPost("add-developers")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
@@ -209,6 +227,7 @@ public class GameController : AppControllerBase
         return Results.Ok(devs.Select(d => d.Id));
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPost("add-genres")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -275,6 +294,7 @@ public class GameController : AppControllerBase
     }
 
 
+    [Authorize(Roles = "Admin")]
     [HttpPost("add-version")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -348,50 +368,61 @@ public class GameController : AppControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IResult> BuyGame(int gameId)
+    public async Task<IResult> BuyGame([FromBody] List<int> gameIds)
     {
         var login = User.FindFirstValue(ClaimTypes.Name);
 
         if (string.IsNullOrEmpty(login))
             return Results.Unauthorized();
 
-        _logger.LogInformation("Пользователь {Login} хочет купить игру {GameId}", login, gameId);
+        _logger.LogInformation("Пользователь {Login} хочет купить игры {GameIds}", login, gameIds);
 
         using var transaction = await _ctx.Database.BeginTransactionAsync();
 
         if (await _userService.Get(login) is not User user)
             return Results.BadRequest(NOT_FOUND_EXACT_MESSAGE($"Пользователь {login}"));
 
-        if (await _gameService.Get(gameId) is not Game game)
-            return Results.BadRequest(NOT_FOUND_EXACT_MESSAGE($"Игра с id: {gameId}"));
 
-        GameUser gameUser = new GameUser
+        //Переделать под мн-во игр - сделать проверки и реализовать
+        var foundGames = await _gameService.Get(gameIds);
+        if (foundGames == null)
+            return Results.BadRequest("Ошибка с соединением с бд");
+
+        float priceSum = 0;
+        List<GameUser> gameUsers = new List<GameUser>(foundGames.Count);
+        foreach(var game in foundGames)
         {
-            UserId = user.Id,
-            GameId = gameId,
-            Price = game.Price,
-            DatePurchase = DateOnly.FromDateTime(DateTime.UtcNow)
-        };
+            GameUser gameUser = new GameUser
+            {
+                UserId = user.Id,
+                GameId = game.Id,
+                Price = game.Price,
+                DatePurchase = DateOnly.FromDateTime(DateTime.UtcNow)
+            };
+            gameUsers.Add(gameUser);
+            priceSum += game.Price;
+        }
 
-        int gameAdded = await _gameService.AddGameToUser(gameUser);
+        int gameAdded = await _gameService.AddGameToUser(gameUsers);
 
         if (gameAdded == 0)
-            return Results.Conflict($"Пользователь {login} уже приобрел игру {game.Title}");
+            return Results.Conflict($"Пользователь {login} уже приобрел данные игры");
 
         var check = await _ctx.Users
-            .Where(u => u.Login == login && u.Wallet >= game.Price)
-            .ExecuteUpdateAsync(s => s.SetProperty(u => u.Wallet, u => u.Wallet - game.Price));
+            .Where(u => u.Login == login && u.Wallet >= priceSum)
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.Wallet, u => u.Wallet - priceSum));
 
         if (check == 0)
             return Results.BadRequest($"На балансе пользователя {login} недостаточно средств!");
 
         await transaction.CommitAsync();
 
-        _logger.LogInformation("Пользователь {Login} успешно купил игру {Title}", login, game.Title);
+        _logger.LogInformation("Пользователь {Login} успешно купил игры {GameIds}", login, gameIds);
 
-        return Results.Ok($"Пользователь {login} успешно приобрел игру {game.Title}!");
+        return Results.Ok($"Пользователь {login} успешно приобрел игры {gameIds}!");
     }
 
+    [Authorize]
     [HttpGet("get-library")]
     [ProducesResponseType(typeof(ICollection<int>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

@@ -17,6 +17,7 @@ namespace Gamestore.Controllers
 
         public GenreController(DbCtx db, ILogger<GenreController> logger, GenreService genreService) : base(db, logger) { _genreService = genreService; }
 
+        [Authorize(Roles = "Admin")]
         [HttpPost("add")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]

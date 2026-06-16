@@ -23,6 +23,7 @@ namespace Gamestore.Controllers
             _publisherService = publisherService;
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpPost("add")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]

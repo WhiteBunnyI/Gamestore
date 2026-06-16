@@ -17,6 +17,7 @@ public class CountryController : AppControllerBase
         _countryService = countryService;
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPost("add")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]

@@ -23,6 +23,7 @@ public class DeveloperController : AppControllerBase
         _developerService = developerService;
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPost("add")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]

@@ -33,6 +33,28 @@ public class GameService
             .FirstOrDefaultAsync();
     }
 
+    public async Task<List<Game>> Get(ICollection<int> ids)
+    {
+        return await _ctx.Games
+            .Where(g => ids.Contains(g.Id))
+            .ToListAsync();
+    }
+
+    public async Task<List<Game>> Get(int limit, int offset)
+    {
+        //Не очень хорошо, лучше использовать пагинацию по индексу
+        //То т.к. таблица небольшая, можно и так
+        return await _ctx.Games
+            .Skip(offset)
+            .Take(limit)
+            .ToListAsync();
+    }
+
+    public async Task<int> GetCount()
+    {
+        return await _ctx.Games.CountAsync();
+    }
+
     public async Task<int> Delete(int id)
     {
         return await _ctx.Games
@@ -144,6 +166,15 @@ public class GameService
     {
         return await _ctx.GameUsers
             .Upsert(data)
+            .On(gu => new { gu.GameId, gu.UserId })
+            .NoUpdate()
+            .RunAsync();
+    }
+
+    public async Task<int> AddGameToUser(ICollection<GameUser> data)
+    {
+        return await _ctx.GameUsers
+            .UpsertRange(data)
             .On(gu => new { gu.GameId, gu.UserId })
             .NoUpdate()
             .RunAsync();

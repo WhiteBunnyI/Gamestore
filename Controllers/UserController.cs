@@ -18,19 +18,19 @@ namespace Gamestore.Controllers
             _userService = userService;
         }
 
-        [HttpPost("add")]
-        [ProducesResponseType(typeof(User), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
-        public async Task<IResult> AddUser([FromBody] User.UserDto dto)
-        {
+        //[HttpPost("add")]
+        //[ProducesResponseType(typeof(User), StatusCodes.Status200OK)]
+        //[ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+        //public async Task<IResult> AddUser([FromBody] User.UserDto dto)
+        //{
 
-            int added = await _userService.Add(new User() { Login = dto.Login });
+        //    int added = await _userService.Add(new User() { Login = dto.Login });
 
-            if (added == 0)
-                return Results.BadRequest(CONFLICT_AUTO_MESSAGE);
+        //    if (added == 0)
+        //        return Results.BadRequest(CONFLICT_AUTO_MESSAGE);
 
-            return Results.Ok(SUCCESS_ADDED_AUTO_MESSAGE);
-        }
+        //    return Results.Ok(SUCCESS_ADDED_AUTO_MESSAGE);
+        //}
 
         [HttpGet("get")]
         [ProducesResponseType(typeof(User), StatusCodes.Status200OK)]
@@ -50,6 +50,7 @@ namespace Gamestore.Controllers
             return Results.Ok(user);
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpPut("deposit")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
