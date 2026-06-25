@@ -58,9 +58,9 @@
             elements.cardGrid.appendChild(child);
         }
 
-        window.Main.onUpdateAuthUI.push(UpdateShopUI);
-        window.Main.onUpdateAuthUI.push(UpdateCartUI);
-        window.Main.onLogout.push(() => { game_cart = []; sum = 0; });
+        window.Auth.onUpdateAuthUI.push(UpdateShopUI);
+        window.Auth.onUpdateAuthUI.push(UpdateCartUI);
+        window.Auth.onLogout.push(() => { game_cart = []; sum = 0; });
 
         UpdateShopUI();
         UpdateCartUI();
@@ -121,7 +121,7 @@
             el.price.textContent = games[i].price + ' $';
             ShowElement(el.btn);
             UpdateCardBtnUI(el);
-            if (!window.Main.isAuth() || window.Main.isAdmin()) {
+            if (!window.Auth.isAuth() || window.Auth.isAdmin()) {
                 HideElement(el.btn);
             }
         }
@@ -138,7 +138,7 @@
     }
 
     async function BuyGames() {
-        if (Main.wallet() < sum_cart) {
+        if (Auth.wallet() < sum_cart) {
             notify.error(`На балансе не хватает денег!`);
             return;
         }
@@ -160,8 +160,12 @@
             },
             body: JSON.stringify(game_ids),
         }
-        const response = await window.Main.ExecuteWithToken('api/games/buy', options);
+        const response = await window.Auth.ExecuteUrlWithToken('api/games/buy', options);
 
+        if (response.status === 200) {
+            notify.info("Покупка успешно совершена!");
+            Auth.UpdateAuthUI();
+        }
     }
 
     function UpdateCardBtnUI(el) {

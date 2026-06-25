@@ -3,7 +3,7 @@
 
 // Write your JavaScript code.
 
-window.Main = window.Main || (function () {
+window.Auth = window.Auth || (function () {
 
     let log = console.log;
 
@@ -334,6 +334,7 @@ window.Main = window.Main || (function () {
         onUpdateAuthUI: onUpdateAuthUI,
         onLogout: onLogout,
         wallet: () => user_info?.wallet || 0,
-        ExecuteUrlWithToken: ExecuteWithToken,
+        ExecuteUrlWithToken: async (url, options) => ExecuteWithToken(url, options),
+        UpdateAuthUI: () => UpdateAuthUI(),
     }
 })();
