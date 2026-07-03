@@ -57,7 +57,7 @@ public class AuthController : AppControllerBase
             return Results.BadRequest("Unknown ip address");
 
         if (AuthService.AdminLogin.Equals(dto.Login))
-            return Results.BadRequest("Нельзя регистрировать пользователя с таким именем");
+            return Results.BadRequest("Нельзя зарегистрировать пользователя с таким именем");
 
         User user = new User() { Login = dto.Login };
         int added = await _userService.Add(user);

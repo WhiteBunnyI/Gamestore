@@ -45,6 +45,7 @@ public class GameService
         //Не очень хорошо, лучше использовать пагинацию по индексу
         //То т.к. таблица небольшая, можно и так
         return await _ctx.Games
+            .OrderBy(g => g.Id)
             .Skip(offset)
             .Take(limit)
             .ToListAsync();
