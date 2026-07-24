@@ -108,7 +108,7 @@
         if (cards === null || games === null) {
             return;
         }
-
+        const maxDescLen = 35;
         for (let i = 0; i < games.length; i++) {
             //Exists
             let el = cards[i];
@@ -116,7 +116,10 @@
             el.icon.src = `https://placehold.co/600x400/e9ecef/495057?text=${games[i].title}`;
             HideElement(el.badge);
             el.title.textContent = games[i].title;
-            el.desc.textContent = games[i].description;
+            el.desc.textContent = games[i].description.substring(0, maxDescLen);
+            if (el.desc.textContent.length === maxDescLen) {
+                el.desc.textContent += '...';
+            }
             HideElement(el.oldPrice);
             el.price.textContent = games[i].price + ' $';
             ShowElement(el.btn);
